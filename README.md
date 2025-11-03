@@ -68,3 +68,7 @@ This section has moved here: [https://facebook.github.io/create-react-app/docs/d
 ### `npm run build` fails to minify
 
 This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+
+## Removed tools
+
+Note: auxiliary scan scripts that were previously present under `tools/` (EMA scan and symbols cache) were removed per user request. If you relied on those tools, please restore them from your own backups or contact the project maintainer.
