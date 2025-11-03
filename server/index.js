@@ -1,3 +1,4 @@
+require('dotenv').config();
 const axios = require('axios');
 const WebSocket = require('ws');
 const express = require('express');
@@ -41,6 +42,8 @@ function sendTelegram(message) {
     text: message,
   }).catch((err) => console.error('Telegram send error', err.message || err));
 }
+
+
 
 function connectWebSocket() {
   // Use Binance Futures (USDT-M) websocket (fstream)
@@ -107,6 +110,17 @@ async function start() {
 const app = express();
 app.get('/health', (req, res) => {
   res.json({ ok: true, symbol: SYMBOL, lastPrice, ema9, ema26, prevCross });
+});
+
+// test endpoint to trigger a Telegram test message (no auth) - useful in local dev
+// GET /send-test?message=hello
+app.get('/send-test', (req, res) => {
+  const msg = req.query.message || `${SYMBOL} - test alert from server`;
+  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
+    return res.status(400).json({ ok: false, error: 'Telegram not configured' });
+  }
+  sendTelegram(msg);
+  return res.json({ ok: true, sent: msg });
 });
 
 app.listen(PORT, () => {

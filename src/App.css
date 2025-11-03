@@ -133,10 +133,12 @@ button.secondary {
   gap: 12px;
 }
 .alert-left {
-  min-width: 78px;
+  min-width: 120px;
+  max-width: 160px;
   display: flex;
   align-items: center;
   gap: 8px;
+  flex: none;
 }
 .alert-indicator {
   width: 10px;
@@ -150,6 +152,10 @@ button.secondary {
   font-size: 12px;
   color: #0f172a;
   font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
 }
 .alert-body {
   flex: 1;
@@ -159,17 +165,22 @@ button.secondary {
 }
 .alert-info {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
 }
 .alert-type-short {
   font-size: 13px;
   color: #0f172a;
   font-weight: 600;
   text-transform: capitalize;
+  flex: none;
 }
 .alert-time {
   font-size: 12px;
   color: #6b7280;
+  flex: none;
 }
 .alert-right {
   display: flex;
