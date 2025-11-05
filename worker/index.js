@@ -1,3 +1,6 @@
+/* eslint-disable no-restricted-globals */
+/* global globalThis */
+// Worker uses global bindings for secrets (set via wrangler or Cloudflare dashboard)
 addEventListener('fetch', event => {
   event.respondWith(handle(event.request, event));
 });
@@ -14,9 +17,10 @@ async function handle(req, event) {
   }
 
   try {
-    const body = await req.json();
-    const botToken = TELEGRAM_BOT_TOKEN || (typeof TW_TELEGRAM_BOT_TOKEN !== 'undefined' && TW_TELEGRAM_BOT_TOKEN) || '';
-    const chatId = TELEGRAM_CHAT_ID || (typeof TW_TELEGRAM_CHAT_ID !== 'undefined' && TW_TELEGRAM_CHAT_ID) || '';
+  const body = await req.json();
+  // read secrets from globalThis (bindings)
+  const botToken = (globalThis && globalThis.TELEGRAM_BOT_TOKEN) ? String(globalThis.TELEGRAM_BOT_TOKEN) : '';
+  const chatId = (globalThis && globalThis.TELEGRAM_CHAT_ID) ? String(globalThis.TELEGRAM_CHAT_ID) : '';
     if (!botToken || !chatId) {
       return new Response(JSON.stringify({ ok: false, error: 'Telegram not configured' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
     }

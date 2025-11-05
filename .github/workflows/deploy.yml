@@ -34,7 +34,8 @@ jobs:
           directory: './build'
 
       - name: Publish Worker (Telegram relay)
-        uses: cloudflare/wrangler-action@2
+        # use the stable v1 action for wrangler deployments
+        uses: cloudflare/wrangler-action@1
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
           workingDirectory: './worker'
