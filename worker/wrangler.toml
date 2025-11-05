@@ -1,0 +1,8 @@
+name = "binance-alert-worker"
+main = "index.js"
+compatibility_date = "2025-11-05"
+# Set your account_id here before deploying or use wrangler CLI with --account-id
+account_id = "your_account_id_here"
+
+# Optional: route or workers.dev subdomain handled by Cloudflare
+# See README_DEPLOY.md for details on configuring account/project
