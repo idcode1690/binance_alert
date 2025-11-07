@@ -85,6 +85,10 @@ export default function ScannerPage({ availableSymbols, fetchExchangeInfo, monit
         interval: Number.isFinite(mins) && mins > 0 ? mins : monitorMinutes,
         emaShort: Number.isFinite(ema1) && ema1 > 0 ? ema1 : monitorEma1,
         emaLong: Number.isFinite(ema2) && ema2 > 0 ? ema2 : monitorEma2,
+        // conservative runtime options to avoid hitting API rate limits on start
+        concurrency: 1,
+        batchDelay: 1000,
+        maxConcurrency: 2,
       };
       scannerManager.start('golden', opts);
       // persist scanner choices as defaults
@@ -101,6 +105,10 @@ export default function ScannerPage({ availableSymbols, fetchExchangeInfo, monit
         interval: Number.isFinite(mins) && mins > 0 ? mins : monitorMinutes,
         emaShort: Number.isFinite(ema1) && ema1 > 0 ? ema1 : monitorEma1,
         emaLong: Number.isFinite(ema2) && ema2 > 0 ? ema2 : monitorEma2,
+        // conservative runtime options to avoid hitting API rate limits on start
+        concurrency: 1,
+        batchDelay: 1000,
+        maxConcurrency: 2,
       };
       scannerManager.start('dead', opts);
       // persist scanner choices as defaults
