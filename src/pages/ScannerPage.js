@@ -69,6 +69,22 @@ export default function ScannerPage({ availableSymbols, fetchExchangeInfo, monit
     } catch (e) {}
   }, []);
 
+  // If no scannerDefaults are present in localStorage, persist the current parent monitor values
+  // so the scanner becomes independent immediately after first mount.
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('scannerDefaults');
+      if (!raw) {
+        const mins = Number.isFinite(Number(monitorMinutes)) ? monitorMinutes : (parseInt(minsStr, 10) || undefined);
+        const ema1 = Number.isFinite(Number(monitorEma1)) ? monitorEma1 : (parseInt(ema1Str, 10) || undefined);
+        const ema2 = Number.isFinite(Number(monitorEma2)) ? monitorEma2 : (parseInt(ema2Str, 10) || undefined);
+        saveScannerDefaults(mins || '', ema1 || '', ema2 || '');
+      }
+    } catch (e) {}
+    // run once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const startGolden = useCallback(() => {
     try {
       const mins = parseInt(minsStr, 10);
