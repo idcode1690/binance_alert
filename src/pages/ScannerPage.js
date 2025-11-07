@@ -7,20 +7,23 @@ export default function ScannerPage({ availableSymbols, fetchExchangeInfo, monit
 
   // Local string inputs so Scanner page inputs are independent from the Alerts/Controls inputs.
   // Initialize from localStorage (scannerDefaults) when available so the Scanner retains its own
-  // saved defaults across navigation. If no saved defaults exist, fall back to parent monitor props.
+  // saved defaults across navigation. IMPORTANT: if no scannerDefaults exist, do NOT read
+  // parent `monitor*` props — instead use fixed sane defaults so the Scanner will not follow
+  // the Alerts/Controls values.
   function readScannerDefaults() {
     try {
       const raw = localStorage.getItem('scannerDefaults');
       if (raw) {
         const p = JSON.parse(raw);
         return {
-          mins: typeof p.mins !== 'undefined' ? String(p.mins) : String(monitorMinutes ?? ''),
-          ema1: typeof p.ema1 !== 'undefined' ? String(p.ema1) : String(monitorEma1 ?? ''),
-          ema2: typeof p.ema2 !== 'undefined' ? String(p.ema2) : String(monitorEma2 ?? ''),
+          mins: typeof p.mins !== 'undefined' ? String(p.mins) : '5',
+          ema1: typeof p.ema1 !== 'undefined' ? String(p.ema1) : '26',
+          ema2: typeof p.ema2 !== 'undefined' ? String(p.ema2) : '200',
         };
       }
     } catch (e) {}
-    return { mins: String(monitorMinutes ?? ''), ema1: String(monitorEma1 ?? ''), ema2: String(monitorEma2 ?? '') };
+    // NO parent prop usage here — return fixed defaults to avoid following Alerts values
+    return { mins: '5', ema1: '26', ema2: '200' };
   }
 
   const initialScanner = readScannerDefaults();
@@ -69,21 +72,9 @@ export default function ScannerPage({ availableSymbols, fetchExchangeInfo, monit
     } catch (e) {}
   }, []);
 
-  // If no scannerDefaults are present in localStorage, persist the current parent monitor values
-  // so the scanner becomes independent immediately after first mount.
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem('scannerDefaults');
-      if (!raw) {
-        const mins = Number.isFinite(Number(monitorMinutes)) ? monitorMinutes : (parseInt(minsStr, 10) || undefined);
-        const ema1 = Number.isFinite(Number(monitorEma1)) ? monitorEma1 : (parseInt(ema1Str, 10) || undefined);
-        const ema2 = Number.isFinite(Number(monitorEma2)) ? monitorEma2 : (parseInt(ema2Str, 10) || undefined);
-        saveScannerDefaults(mins || '', ema1 || '', ema2 || '');
-      }
-    } catch (e) {}
-    // run once on mount
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Note: do NOT auto-persist parent monitor values on mount; that would copy Alerts values
+  // into Scanner and re-create the follow behavior. Scanner defaults are only set when the
+  // user explicitly starts a scan (startGolden/startDead) which persists their choices.
 
   const startGolden = useCallback(() => {
     try {
