@@ -6,11 +6,27 @@ export default function ScannerPage({ availableSymbols, fetchExchangeInfo, monit
   const [state, setState] = useState(scannerManager.getState());
 
   // Local string inputs so Scanner page inputs are independent from the Alerts/Controls inputs.
-  // We intentionally do NOT call parent's setMonitor* on every keystroke to avoid forcing 0
-  // and to keep the pages decoupled. The scanner will use these local values when starting a scan.
-  const [minsStr, setMinsStr] = useState(String(monitorMinutes ?? ''));
-  const [ema1Str, setEma1Str] = useState(String(monitorEma1 ?? ''));
-  const [ema2Str, setEma2Str] = useState(String(monitorEma2 ?? ''));
+  // Initialize from localStorage (scannerDefaults) when available so the Scanner retains its own
+  // saved defaults across navigation. If no saved defaults exist, fall back to parent monitor props.
+  function readScannerDefaults() {
+    try {
+      const raw = localStorage.getItem('scannerDefaults');
+      if (raw) {
+        const p = JSON.parse(raw);
+        return {
+          mins: typeof p.mins !== 'undefined' ? String(p.mins) : String(monitorMinutes ?? ''),
+          ema1: typeof p.ema1 !== 'undefined' ? String(p.ema1) : String(monitorEma1 ?? ''),
+          ema2: typeof p.ema2 !== 'undefined' ? String(p.ema2) : String(monitorEma2 ?? ''),
+        };
+      }
+    } catch (e) {}
+    return { mins: String(monitorMinutes ?? ''), ema1: String(monitorEma1 ?? ''), ema2: String(monitorEma2 ?? '') };
+  }
+
+  const initialScanner = readScannerDefaults();
+  const [minsStr, setMinsStr] = useState(initialScanner.mins);
+  const [ema1Str, setEma1Str] = useState(initialScanner.ema1);
+  const [ema2Str, setEma2Str] = useState(initialScanner.ema2);
 
   // Note: intentionally do NOT re-sync local scanner inputs when parent monitor values change.
   // This keeps Scanner inputs independent from the Alerts/Controls values after initial mount.
@@ -46,6 +62,13 @@ export default function ScannerPage({ availableSymbols, fetchExchangeInfo, monit
     return () => off();
   }, []);
 
+  const saveScannerDefaults = useCallback((mins, ema1, ema2) => {
+    try {
+      const obj = { mins: mins, ema1: ema1, ema2: ema2 };
+      localStorage.setItem('scannerDefaults', JSON.stringify(obj));
+    } catch (e) {}
+  }, []);
+
   const startGolden = useCallback(() => {
     try {
       const mins = parseInt(minsStr, 10);
@@ -57,8 +80,10 @@ export default function ScannerPage({ availableSymbols, fetchExchangeInfo, monit
         emaLong: Number.isFinite(ema2) && ema2 > 0 ? ema2 : monitorEma2,
       };
       scannerManager.start('golden', opts);
+      // persist scanner choices as defaults
+      saveScannerDefaults(opts.interval, opts.emaShort, opts.emaLong);
     } catch (e) {}
-  }, [minsStr, ema1Str, ema2Str, monitorMinutes, monitorEma1, monitorEma2]);
+  }, [minsStr, ema1Str, ema2Str, monitorMinutes, monitorEma1, monitorEma2, saveScannerDefaults]);
 
   const startDead = useCallback(() => {
     try {
@@ -71,8 +96,10 @@ export default function ScannerPage({ availableSymbols, fetchExchangeInfo, monit
         emaLong: Number.isFinite(ema2) && ema2 > 0 ? ema2 : monitorEma2,
       };
       scannerManager.start('dead', opts);
+      // persist scanner choices as defaults
+      saveScannerDefaults(opts.interval, opts.emaShort, opts.emaLong);
     } catch (e) {}
-  }, [minsStr, ema1Str, ema2Str, monitorMinutes, monitorEma1, monitorEma2]);
+  }, [minsStr, ema1Str, ema2Str, monitorMinutes, monitorEma1, monitorEma2, saveScannerDefaults]);
   function stopScan() { try { scannerManager.stop(); } catch (e) {} }
 
   const running = !!state.running;
