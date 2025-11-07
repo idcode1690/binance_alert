@@ -181,15 +181,24 @@ export default function ScannerPage({ availableSymbols, fetchExchangeInfo, monit
         <div className="scanner-controls-left">
           <label className="control-inline-label">
             <span className="label-text">Mins</span>
-            <input type="number" min="1" value={minsStr} onChange={(e) => setMinsStr(e.target.value)} />
+            <input type="number" min="1" value={minsStr} onChange={(e) => setMinsStr(e.target.value)} onBlur={() => {
+              const p = parseInt(minsStr, 10);
+              if (Number.isFinite(p) && p > 0) saveScannerDefaults(p, parseInt(ema1Str, 10) || '', parseInt(ema2Str, 10) || '');
+            }} />
           </label>
           <label className="control-inline-label">
             <span className="label-text">EMA1</span>
-            <input type="number" min="1" value={ema1Str} onChange={(e) => setEma1Str(e.target.value)} />
+            <input type="number" min="1" value={ema1Str} onChange={(e) => setEma1Str(e.target.value)} onBlur={() => {
+              const p = parseInt(ema1Str, 10);
+              if (Number.isFinite(p) && p > 0) saveScannerDefaults(parseInt(minsStr, 10) || '', p, parseInt(ema2Str, 10) || '');
+            }} />
           </label>
           <label className="control-inline-label">
             <span className="label-text">EMA2</span>
-            <input type="number" min="1" value={ema2Str} onChange={(e) => setEma2Str(e.target.value)} />
+            <input type="number" min="1" value={ema2Str} onChange={(e) => setEma2Str(e.target.value)} onBlur={() => {
+              const p = parseInt(ema2Str, 10);
+              if (Number.isFinite(p) && p > 0) saveScannerDefaults(parseInt(minsStr, 10) || '', parseInt(ema1Str, 10) || '', p);
+            }} />
           </label>
         </div>
 
