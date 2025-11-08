@@ -24,6 +24,7 @@
     "dev": "concurrently \"npm run start:server\" \"npm start\"",
     "build": "react-scripts build",
     "test": "react-scripts test",
+    "deploy:worker": "wrangler publish --config ./worker/wrangler.toml",
     "eject": "react-scripts eject"
   },
   "eslintConfig": {
