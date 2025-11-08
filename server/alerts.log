@@ -78,3 +78,6 @@
 {"ts":1762580999193,"receipt":true,"symbol":"BTCUSDT","price":102376.3,"emaShort":26,"emaLong":200,"interval":"1m","message":"Bearish EMA26 < EMA200 @ 102376.3 (EMA26/200)"}
 {"ts":1762580999739,"receipt":true,"symbol":"BTCUSDT","price":102376.3,"emaShort":26,"emaLong":200,"interval":"1m","message":"Bearish EMA26 < EMA200 @ 102376.3 (EMA26/200)"}
 {"ts":1762581000750,"receipt":true,"symbol":"BTCUSDT","price":102376.3,"emaShort":26,"emaLong":200,"interval":"1m","message":"Bearish EMA26 < EMA200 @ 102376.3 (EMA26/200)"}
+{"ts":1762637997483,"receipt":true,"symbol":"BTCUSDT","price":102180.3,"emaShort":26,"emaLong":200,"interval":"1m","message":"Bullish EMA26 > EMA200 @ 102180.3 (EMA26/200)"}
+{"ts":1762637998022,"receipt":true,"symbol":"BTCUSDT","price":102180.3,"emaShort":26,"emaLong":200,"interval":"1m","message":"Bullish EMA26 > EMA200 @ 102180.3 (EMA26/200)"}
+{"ts":1762637999041,"receipt":true,"symbol":"BTCUSDT","price":102180.3,"emaShort":26,"emaLong":200,"interval":"1m","message":"Bullish EMA26 > EMA200 @ 102180.3 (EMA26/200)"}
