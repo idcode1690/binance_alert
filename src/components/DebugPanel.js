@@ -1,7 +1,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 
-export default function DebugPanel({ availableSymbols, fetchExchangeInfo, showDebug, setMarketCheckResult, marketCheckResult, symbol }) {
+export default function DebugPanel({ availableSymbols, fetchExchangeInfo, showDebug, setMarketCheckResult, marketCheckResult, symbol, onSimulateAlert }) {
   if (!showDebug) return null;
   return (
     <div className="debug-panel">
@@ -50,6 +50,9 @@ export default function DebugPanel({ availableSymbols, fetchExchangeInfo, showDe
             setMarketCheckResult('error');
           }
         }}>Check markets</button>
+        <button className="small-btn" onClick={() => { try { if (onSimulateAlert) onSimulateAlert(); } catch (e) { console.debug('simulate error', e); } }}>
+          Simulate Alert
+        </button>
       </div>
       {marketCheckResult && <div className="market-result">{marketCheckResult}</div>}
     </div>
@@ -63,4 +66,5 @@ DebugPanel.propTypes = {
   setMarketCheckResult: PropTypes.func.isRequired,
   marketCheckResult: PropTypes.string,
   symbol: PropTypes.string,
+  onSimulateAlert: PropTypes.func,
 };

@@ -2,6 +2,8 @@
 const scannerManager = (() => {
   let running = false;
   let currentSymbol = null;
+  // track current scan type so UI can color progress (e.g., 'golden' | 'dead' | null)
+  let scanType = null;
   let progress = { done: 0, total: 0 };
   // load persisted results from localStorage when available so navigation doesn't lose matches
   let results = [];
@@ -22,7 +24,8 @@ const scannerManager = (() => {
   let getSymbolsFn = null;
 
   function notify() {
-    const state = { running, currentSymbol, progress: { ...progress }, results: results.slice(), scanStartTime };
+    // include scanType in the published state so UI can color the progress bar correctly
+    const state = { running, currentSymbol, scanType, progress: { ...progress }, results: results.slice(), scanStartTime };
     for (const cb of listeners) {
       try { cb(state); } catch (e) {}
     }
@@ -67,12 +70,13 @@ const scannerManager = (() => {
   async function start(type, opts = {}) {
     if (running) return;
     if (typeof getSymbolsFn !== 'function') throw new Error('scannerManager: getSymbolsFn not set');
-    // initialize run state
+  // initialize run state
     running = true;
     cancel = false;
     results = [];
     progress = { done: 0, total: 0 };
     currentSymbol = null;
+  scanType = type || null;
     scanStartTime = Date.now();
     notify();
     const list = (await Promise.resolve(getSymbolsFn())) || [];
@@ -155,7 +159,10 @@ const scannerManager = (() => {
           else if (type === 'dead') { if (prevShort >= prevLong && lastShort < lastLong) matched = true; }
         }
         if (matched) {
-          const ev = { id: `${sym}-${Date.now()}-${Math.random().toString(36).slice(2,8)}`, symbol: sym, lastShort, lastLong, time: new Date().toLocaleString(), interval, emaShort, emaLong };
+          // attach the scan type to the result so the UI can color icons per-result
+          // also capture the last candle volume so the UI can show & sort by volume
+          const lastVolume = (Array.isArray(data) && data[lastIdx] && typeof data[lastIdx][5] !== 'undefined') ? parseFloat(data[lastIdx][5]) : 0;
+          const ev = { id: `${sym}-${Date.now()}-${Math.random().toString(36).slice(2,8)}`, symbol: sym, lastShort, lastLong, time: new Date().toLocaleString(), interval, emaShort, emaLong, type, volume: lastVolume };
           results.unshift(ev);
           // cap stored results to reasonable size (avoid unbounded growth)
           if (results.length > 500) results = results.slice(0, 500);
@@ -198,6 +205,8 @@ const scannerManager = (() => {
       try { for (const c of currentAbortControllers) { try { c.abort(); } catch (e) {} } } catch (e) {}
       currentAbortControllers.clear();
       running = false; currentSymbol = null; cancel = false; scanStartTime = null; notify();
+      // clear scanType after finishing
+      scanType = null;
     }
   }
 
@@ -211,10 +220,13 @@ const scannerManager = (() => {
       }
       currentAbortControllers.clear();
     } catch (e) {}
-    running = false; currentSymbol = null; scanStartTime = null; notify();
+    running = false; currentSymbol = null; scanStartTime = null;
+    // clear scanType when stopping so UI does not remain colored
+    scanType = null;
+    notify();
   }
 
-  function getState() { return { running, currentSymbol, progress: { ...progress }, results: results.slice(), scanStartTime }; }
+  function getState() { return { running, currentSymbol, scanType, progress: { ...progress }, results: results.slice(), scanStartTime }; }
 
   function removeResult(id) {
     if (!id) return;

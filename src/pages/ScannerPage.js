@@ -4,6 +4,8 @@ import scannerManager from '../lib/scannerManager';
 export default function ScannerPage({ availableSymbols, fetchExchangeInfo, monitorMinutes, setMonitorMinutes, monitorEma1, setMonitorEma1, monitorEma2, setMonitorEma2 }) {
   const symbols = useMemo(() => (Array.isArray(availableSymbols) ? availableSymbols.slice() : []), [availableSymbols]);
   const [state, setState] = useState(scannerManager.getState());
+  // local UI-only scan type to immediately reflect button clicks in the progress bar
+  const [uiScanType, setUiScanType] = useState(null);
 
   // Local string inputs so Scanner page inputs are independent from the Alerts/Controls inputs.
   // Initialize from localStorage (scannerDefaults) when available so the Scanner retains its own
@@ -50,6 +52,21 @@ export default function ScannerPage({ availableSymbols, fetchExchangeInfo, monit
   const shownResultsRef = useRef(new Set());
 
   useEffect(() => {
+    // On mount, migrate old localStorage scanner results that lack the new `type` field.
+    // Only run a simple cleanup to avoid showing stale results without scan type.
+    try {
+      const raw = localStorage.getItem('scannerResults');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.some((r) => !r || typeof r.type === 'undefined')) {
+          console.info('scannerResults migration: removing old results missing `type` field');
+          localStorage.removeItem('scannerResults');
+        }
+      }
+    } catch (e) {
+      // ignore parse errors and continue
+    }
+
     // subscribe to manager updates
     const off = scannerManager.onUpdate((s) => setState(s));
     // initialize state and mark any existing results as already shown so we don't beep on mount
@@ -78,6 +95,8 @@ export default function ScannerPage({ availableSymbols, fetchExchangeInfo, monit
 
   const startGolden = useCallback(() => {
     try {
+      // immediately set UI scan type so progress bar color changes on click
+      setUiScanType('golden');
       const mins = parseInt(minsStr, 10);
       const ema1 = parseInt(ema1Str, 10);
       const ema2 = parseInt(ema2Str, 10);
@@ -98,6 +117,8 @@ export default function ScannerPage({ availableSymbols, fetchExchangeInfo, monit
 
   const startDead = useCallback(() => {
     try {
+      // immediately set UI scan type so progress bar color changes on click
+      setUiScanType('dead');
       const mins = parseInt(minsStr, 10);
       const ema1 = parseInt(ema1Str, 10);
       const ema2 = parseInt(ema2Str, 10);
@@ -115,12 +136,30 @@ export default function ScannerPage({ availableSymbols, fetchExchangeInfo, monit
       saveScannerDefaults(opts.interval, opts.emaShort, opts.emaLong);
     } catch (e) {}
   }, [minsStr, ema1Str, ema2Str, monitorMinutes, monitorEma1, monitorEma2, saveScannerDefaults]);
-  function stopScan() { try { scannerManager.stop(); } catch (e) {} }
+  function stopScan() { try { scannerManager.stop(); } catch (e) {} setUiScanType(null); }
+
+  // keep UI scan type in sync with manager state when manager finishes or changes
+  const managerScanType = (state && state.scanType) ? state.scanType : null;
+  useEffect(() => {
+    if (!managerScanType) setUiScanType(null);
+    else setUiScanType(managerScanType);
+  }, [managerScanType]);
 
   const running = !!state.running;
   const currentSymbol = state.currentSymbol;
   const progress = state.progress || { done: 0, total: 0 };
-  const results = useMemo(() => (Array.isArray(state.results) ? state.results.slice() : []), [state.results]);
+  // sort results by volume (descending) so high-volume matches appear first
+  const results = useMemo(() => {
+    const arr = Array.isArray(state.results) ? state.results.slice() : [];
+    try {
+      arr.sort((a, b) => {
+        const va = (a && typeof a.volume === 'number') ? a.volume : (a && a.volume ? Number(a.volume) : 0);
+        const vb = (b && typeof b.volume === 'number') ? b.volume : (b && b.volume ? Number(b.volume) : 0);
+        return (vb || 0) - (va || 0);
+      });
+    } catch (e) {}
+    return arr;
+  }, [state.results]);
 
   // use a ticking 'now' so we can compute elapsed from manager's persistent scanStartTime
   const [now, setNow] = useState(Date.now());
@@ -181,6 +220,17 @@ export default function ScannerPage({ availableSymbols, fetchExchangeInfo, monit
     } catch (e) {}
   }, [results]);
 
+  function formatVolume(v) {
+    try {
+      const n = Number(v || 0);
+      if (!Number.isFinite(n)) return '-';
+      if (Math.abs(n) >= 1e9) return `${(n / 1e9).toFixed(2)}B`;
+      if (Math.abs(n) >= 1e6) return `${(n / 1e6).toFixed(2)}M`;
+      if (Math.abs(n) >= 1e3) return `${(n / 1e3).toFixed(2)}k`;
+      return n.toString();
+    } catch (e) { return '-'; }
+  }
+
   return (
   <div className="alerts">
       {/* modal removed: only play beep when a new match is detected */}
@@ -232,8 +282,12 @@ export default function ScannerPage({ availableSymbols, fetchExchangeInfo, monit
             const total = (progress && progress.total) ? progress.total : ((symbols || []).filter(s => /USDT$/i.test(s)).length || 0);
             const done = (progress && progress.done) ? progress.done : 0;
             const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;
+            // color progress fill to match scanner type (golden=green, dead=red)
+            // prefer immediate UI scan type (set on button click) to reflect the user's action
+            const scanType = uiScanType || (state && state.scanType ? state.scanType : null);
+            const fillClass = `progress-fill ${scanType === 'dead' ? 'dead' : (scanType === 'golden' ? 'golden' : '')}`.trim();
             return (
-              <div role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} className="progress-fill" style={{ width: `${pct}%` }} />
+              <div role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} className={fillClass} style={{ width: `${pct}%` }} />
             );
           })()}
         </div>
@@ -246,7 +300,12 @@ export default function ScannerPage({ availableSymbols, fetchExchangeInfo, monit
           results.map((r, idx) => (
             <li key={r.id || `${r.symbol}-${idx}`} className="alert-item">
               <div className="alert-left">
-                <span className={`alert-indicator bull`} />
+                {/* color indicator per-result (use result.type if available, else fall back to current scanType) */}
+                {(() => {
+                  const t = (r && r.type) ? r.type : (state && state.scanType ? state.scanType : null);
+                  const cls = t === 'dead' ? 'bear' : (t === 'golden' ? 'bull' : 'bull');
+                  return <span className={`alert-indicator ${cls}`} />;
+                })()}
                 <button
                   type="button"
                   className={`alert-symbol copy-btn ${copiedSymbol === r.symbol ? 'copied' : ''}`}
@@ -277,15 +336,17 @@ export default function ScannerPage({ availableSymbols, fetchExchangeInfo, monit
               </div>
               <div className="alert-body">
                 <div className="alert-info">
-                  <div className="alert-type-short">Match</div>
+                {(() => {
+                  const tt = (r && r.type) ? r.type : (state && state.scanType ? state.scanType : null);
+                  const label = tt === 'dead' ? 'Bear' : (tt === 'golden' ? 'Bull' : 'Match');
+                  return <div className="alert-type-short">{label}</div>;
+                })()}
                   <div className="alert-time">{r.time}</div>
                 </div>
-                <div className="alert-right">
-                  <div className="alert-price">{
-                    Number.isFinite(Number(r.lastShort ?? r.last26)) ? Number(r.lastShort ?? r.last26).toFixed(6) : '-'
-                  } / {
-                    Number.isFinite(Number(r.lastLong ?? r.last200)) ? Number(r.lastLong ?? r.last200).toFixed(6) : '-'
-                  }</div>
+                  <div className="alert-right">
+                  <div className="alert-volume" title={`Volume: ${r.volume || 0}`}>
+                    Vol: {formatVolume(r.volume)}
+                  </div>
                   <button type="button" className="delete-result" title="Remove" onClick={() => { try { scannerManager.removeResult(r.id); } catch (e) {} }}>
                     ✕
                   </button>

@@ -7,6 +7,12 @@ on:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    env:
+      # Inject secrets/job-level env so all steps can access them consistently.
+      REACT_APP_SERVER_URL: ${{ secrets.REACT_APP_SERVER_URL }}
+      CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+      CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+      CF_PAGES_PROJECT_NAME: ${{ secrets.CF_PAGES_PROJECT_NAME }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -16,13 +22,26 @@ jobs:
         with:
           node-version: '18'
 
+      - name: Validate required secrets
+        run: |
+          # Fail early if any required secret is missing. Do not print secret values.
+          missing=()
+          [ -z "$REACT_APP_SERVER_URL" ] && missing+=(REACT_APP_SERVER_URL)
+          [ -z "$CF_API_TOKEN" ] && missing+=(CF_API_TOKEN)
+          [ -z "$CF_ACCOUNT_ID" ] && missing+=(CF_ACCOUNT_ID)
+          [ -z "$CF_PAGES_PROJECT_NAME" ] && missing+=(CF_PAGES_PROJECT_NAME)
+          if [ ${#missing[@]} -ne 0 ]; then
+            echo "Error: Missing required repository secrets: ${missing[*]}"
+            echo "Set them using: gh secret set <NAME> --body <value>"
+            exit 1
+          fi
+        shell: bash
+
       - name: Install dependencies
         run: npm ci
 
       - name: Build React app
-        env:
-          # Optional: set REACT_APP_SERVER_URL to your worker URL (leave empty for client-only mode)
-          REACT_APP_SERVER_URL: ${{ secrets.REACT_APP_SERVER_URL }}
+        # REACT_APP_SERVER_URL is provided at the job-level from secrets so the build embeds the correct worker URL
         run: npm run build
 
       - name: Publish to Cloudflare Pages
@@ -34,9 +53,12 @@ jobs:
           directory: './build'
 
       - name: Publish Worker (Telegram relay)
-        # use the stable v1 action for wrangler deployments
-        uses: cloudflare/wrangler-action@1
+        # pin wrangler-action to a specific stable patch release to avoid resolver warnings
+        uses: cloudflare/wrangler-action@v3.14.1
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
           workingDirectory: './worker'
+        env:
+          # make account id available to wrangler if the worker uses it
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
 
