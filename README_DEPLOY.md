@@ -1,6 +1,6 @@
 Cloudflare Pages + Worker deployment
 
-This repository includes a Cloudflare Worker (worker/index.js) and a GitHub Actions workflow (.github/workflows/deploy.yml)
+This repository includes a Cloudflare Worker (`worker/index.js`) and a GitHub Actions workflow (`.github/workflows/deploy.yml`)
 that build and deploy the React app to Cloudflare Pages and publish the Worker which can relay Telegram messages.
 
 Required GitHub Secrets (set in repository Settings -> Secrets):
@@ -20,7 +20,7 @@ Notes:
 Steps to deploy manually (if you prefer):
 1. Install wrangler: npm i -g wrangler
 2. Configure wrangler with your account: wrangler login
-3. Change into worker directory and publish: wrangler publish
+3. Change into worker directory and publish: wrangler publish (or from project root: npm run deploy:worker)
 4. Set REACT_APP_SERVER_URL to the worker URL and run npm run build then upload to Pages (or push to GitHub to trigger workflow).
 
 Security:
@@ -28,4 +28,26 @@ Security:
 
 If you want, I can also:
 - Commit these files to the repository (already added) and help you set up the GitHub secrets list with exact names and instructions.
-- Add a small example of how to test the worker via curl.
+- Add a small example of how to test the worker via curl:
+
+Test endpoints (replace your workers.dev subdomain):
+
+```
+# Health check
+curl -s https://binance-alert-worker.your-subdomain.workers.dev/health | jq
+
+# Send alert (POST JSON)
+curl -s -X POST \
+	-H "Content-Type: application/json" \
+	-d '{
+		"symbol": "BTCUSDT",
+		"message": "Bull cross",
+		"price": 100000,
+		"emaShort": 9,
+		"emaLong": 26
+	}' \
+	https://binance-alert-worker.your-subdomain.workers.dev/send-alert | jq
+
+# Price helper (cached for a few seconds)
+curl -s "https://binance-alert-worker.your-subdomain.workers.dev/price?symbol=BTCUSDT" | jq
+```

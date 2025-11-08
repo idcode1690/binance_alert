@@ -87,7 +87,8 @@ function App() {
         if (parsed && typeof parsed.monitorConfirm !== 'undefined') return Number(parsed.monitorConfirm) || 1;
       }
     } catch (e) {}
-    return 1;
+    // increase default confirmation to 2 closed candles to reduce false positives
+    return 2;
   });
   const [marketCheckResult, setMarketCheckResult] = useState(null);
   // helper to fetch exchangeInfo and populate availableSymbols
@@ -186,27 +187,14 @@ function App() {
       return [ev, ...prev].slice(0, 500);
     });
   }, [isDuplicateEvent, showDebug]);
-  // Wire scannerManager to provide available symbols and forward matches into App events
+  // Inform scannerManager about available symbols.
+  // IMPORTANT: do NOT forward raw scanner "results" into the global Alerts/events list here.
+  // Scanner results are shown on the separate Scanner page and should not be mixed with Alerts.
   useEffect(() => {
     try {
       scannerManager.setGetSymbols(() => availableSymbols || []);
-      const off = scannerManager.onUpdate((s) => {
-        try {
-          // s.results contains matches; forward them as 'alert' events into the main events list
-          if (s && Array.isArray(s.results) && s.results.length > 0) {
-            for (const r of s.results) {
-              try {
-                const priceVal = (typeof r.lastShort !== 'undefined' && r.lastShort != null) ? r.lastShort : ((typeof r.lastLong !== 'undefined' && r.lastLong != null) ? r.lastLong : (typeof r.price !== 'undefined' ? r.price : null));
-                const ev = { ts: Date.now(), time: r.time || new Date().toLocaleString(), type: 'alert', price: priceVal, symbol: (r.symbol || '').toString().replace(/[^A-Za-z0-9]/g, '').toUpperCase(), source: 'scanner' };
-                addEvent(ev);
-              } catch (e) {}
-            }
-          }
-        } catch (e) {}
-      });
-      return () => { try { off(); } catch (e) {} };
     } catch (e) {}
-  }, [availableSymbols, addEvent]);
+  }, [availableSymbols]);
   const showToast = React.useCallback((message, ok = true) => {
     try {
       setToast({ message, ok, ts: Date.now() });
@@ -224,7 +212,9 @@ function App() {
   const [view, setView] = useState('alerts');
   // serverUrl is provided at build-time via REACT_APP_SERVER_URL; when not set
   // the app should run in "client-only" mode (no SSE, no server Telegram relay).
-  const serverUrl = (process.env.REACT_APP_SERVER_URL && process.env.REACT_APP_SERVER_URL.length > 0) ? process.env.REACT_APP_SERVER_URL : null;
+  // Trim the env var to avoid accidental trailing-space issues embedding a bad URL
+  const _rawServerUrl = (process.env.REACT_APP_SERVER_URL && typeof process.env.REACT_APP_SERVER_URL === 'string') ? process.env.REACT_APP_SERVER_URL : '';
+  const serverUrl = (_rawServerUrl && _rawServerUrl.trim().length > 0) ? _rawServerUrl.trim() : null;
 
   // Debug helper: simulate a confirmed cross from the frontend (calls /send-alert and adds local event)
   const simulateConfirmedCross = React.useCallback((forceType) => {
@@ -232,7 +222,8 @@ function App() {
       const type = forceType || (confirmedCross || 'bull');
       const sym = (activeSymbol || symbol || '').toString().replace(/[^A-Za-z0-9]/g, '').toUpperCase();
       const price = lastPrice || 0;
-      const text = `${sym} ${type === 'bull' ? 'Bullish EMA9 > EMA26' : 'Bearish EMA9 < EMA26'} @ ${price}`;
+  // Use configured EMA labels (monitorEma1/monitorEma2) in the message text
+  const text = `${sym} ${type === 'bull' ? `Bullish EMA${monitorEma1} > EMA${monitorEma2}` : `Bearish EMA${monitorEma1} < EMA${monitorEma2}`} @ ${price}`;
       // add local event
       const ev = { ts: Date.now(), time: new Date().toLocaleString(), type: type === 'bull' ? 'bull' : 'bear', price, symbol: sym, source: 'client-sim' };
       addEvent(ev);
@@ -245,8 +236,8 @@ function App() {
           return;
         }
         try {
-          if (showDebug) console.debug('[App] simulate sending /send-alert', { url: `${serverUrl}/send-alert`, payload: { symbol: sym, price, message: text } });
-          const res = await fetch(`${serverUrl}/send-alert`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ symbol: sym, price, message: text }) });
+          if (showDebug) console.debug('[App] simulate sending /send-alert', { url: `${serverUrl}/send-alert`, payload: { symbol: sym, price, message: text, emaShort: monitorEma1, emaLong: monitorEma2 } });
+          const res = await fetch(`${serverUrl}/send-alert`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ symbol: sym, price, message: text, emaShort: monitorEma1, emaLong: monitorEma2 }) });
           let json = null;
           try { json = await res.json(); } catch (e) { json = null; }
           const sendEv = { ts: Date.now(), time: new Date().toLocaleString(), type: 'telegram_send', symbol: sym, source: 'client-send', ok: res.ok, status: res.status, body: json };
@@ -262,7 +253,7 @@ function App() {
         }
       })();
     } catch (e) { if (showDebug) console.debug('[App] simulateConfirmedCross error', e); }
-  }, [activeSymbol, symbol, lastPrice, addEvent, showDebug, confirmedCross, showToast, serverUrl]);
+  }, [activeSymbol, symbol, lastPrice, addEvent, showDebug, confirmedCross, showToast, serverUrl, monitorEma1, monitorEma2]);
 
  
 
@@ -522,7 +513,7 @@ function App() {
 
   // react to confirmed cross changes and notify (skip initial)
   useEffect(() => {
-    if (!confirmedCross) return;
+  if (!confirmedCross) return;
     // If the confirmed signal came from initial seeding, don't notify — treat as seeded state
     if (confirmedSource === 'init') {
       // ensure we don't trigger notification for seed values
@@ -536,7 +527,7 @@ function App() {
     }
 
     if (lastNotified.current !== confirmedCross) {
-      const type = confirmedCross === 'bull' ? 'Bullish EMA9 > EMA26' : 'Bearish EMA9 < EMA26';
+  const type = confirmedCross === 'bull' ? `Bullish EMA${monitorEma1} > EMA${monitorEma2}` : `Bearish EMA${monitorEma1} < EMA${monitorEma2}`;
       const symToShowRaw = activeSymbol || symbol || '';
       const symToShow = (symToShowRaw || '').toString().replace(/[^A-Za-z0-9]/g, '').toUpperCase();
         // Determine the authoritative price to show/send. Prefer closed-candle `lastPrice`,
@@ -564,7 +555,7 @@ function App() {
           if (showDebug) console.debug('[App] confirmedCross skipped POST /send-alert because serverUrl is not set');
           return;
         }
-        const payload = { symbol: symToShow, price: priceToUse, message: type + ' @ ' + priceToUse };
+  const payload = { symbol: symToShow, price: priceToUse, message: type + ' @ ' + priceToUse, emaShort: monitorEma1, emaLong: monitorEma2 };
         // debug: log state used for send-alert so we can trace mismatched alerts
         try {
           console.log('[App] sending /send-alert', { sendSym: symToShow, selectedSymbol: symbol, activeSymbol, confirmedCross, confirmedSource, ema9, ema26, lastPrice, lastTick });
@@ -618,7 +609,7 @@ function App() {
       setEvents((s) => [evObj, ...s].slice(0, 500));
       lastNotified.current = confirmedCross;
     }
-  }, [confirmedCross, lastPrice, lastTick, symbol, activeSymbol, confirmedSource, showDebug, addEvent, showToast, ema9, ema26, serverUrl]);
+  }, [confirmedCross, lastPrice, lastTick, symbol, activeSymbol, confirmedSource, showDebug, addEvent, showToast, ema9, ema26, serverUrl, monitorEma1, monitorEma2]);
 
   // 심볼이 바뀔 때 이전 심볼의 알림 상태가 남아 있어 잘못된 알림이 뜨는 문제 방지
   // 심볼을 변경하면 lastNotified를 초기화해서 다음 confirmedCross는 초기 시드로 처리되도록 한다.
