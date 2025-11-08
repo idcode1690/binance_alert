@@ -5,9 +5,10 @@ services:
     region: oregon
     plan: free
     autoDeploy: true
-    rootDir: server
-    buildCommand: "npm ci"
-    startCommand: "node index.js"
+    # Removed rootDir so dependencies at project root are installed.
+    # Build also runs the React production build so Express can serve /build.
+    buildCommand: "npm ci && npm run build"
+    startCommand: "node server/index.js"
     envVars:
       - key: TELEGRAM_BOT_TOKEN
         value: ""
@@ -15,5 +16,8 @@ services:
         value: ""
       - key: NODE_ENV
         value: production
+      # Optional: override default symbol monitored at startup
+      - key: SYMBOL
+        value: BTCUSDT
     healthCheckPath: /health
     pullRequestPreviewsEnabled: false

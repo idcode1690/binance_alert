@@ -32,23 +32,28 @@ If you want, I can also:
 
 Always-on server (Render) deployment
 -----------------------------------
-This repo includes a Render blueprint (`render.yaml`) to run the Node/Express server (under `server/`) 24/7.
+This repo includes a Render blueprint (`render.yaml`) to run the Node/Express server (under `server/`) 24/7 and serve the React build from `/build`.
 
-Steps:
-1. Push this repo to GitHub (done).
-2. Go to Render Dashboard → New + → Blueprint → connect this repo.
-3. Review service settings from `render.yaml`:
-	- rootDir: `server`
-	- build: `npm ci`
-	- start: `node index.js`
-	- health check: `/health`
-4. Add environment variables in Render:
-	- TELEGRAM_BOT_TOKEN
-	- TELEGRAM_CHAT_ID
-5. Create resources. First deploy will start automatically. Render sets `PORT` automatically; the server reads `process.env.PORT`.
-6. Note the public URL, e.g. `https://binance-alert-server.onrender.com`.
+What the blueprint does now:
+- Installs dependencies at the project root and builds the React app: `npm ci && npm run build`
+- Starts the server: `node server/index.js`
+- Health check: `/health`
 
-Frontend uses `REACT_APP_SERVER_URL` at build time. If you want the app to connect to the Render server for `/events` or `/send-alert`, set the repo secret `REACT_APP_SERVER_URL` to that URL and push to `master` to trigger a new Pages build.
+Deploy steps:
+1. Push this repo to GitHub (done)
+2. Render Dashboard → New → Blueprint → select this repo
+3. Confirm the defaults from `render.yaml` and click Create Resources
+4. Add environment variables in Render (Dashboard → Service → Environment):
+   - TELEGRAM_BOT_TOKEN (optional if Telegram relay is needed)
+   - TELEGRAM_CHAT_ID (optional if Telegram relay is needed)
+   - NODE_ENV=production (already set by blueprint)
+   - SYMBOL=BTCUSDT (optional; defaults to BTCUSDT)
+5. First deploy will start automatically. Render sets `PORT` and the server uses `process.env.PORT`.
+6. After deploy, note your public URL, e.g. `https://binance-alert-server.onrender.com`.
+
+Usage options:
+- Single service (recommended simple path): open the Render URL above and use the app. No `REACT_APP_SERVER_URL` needed; same-origin calls to `/events` and `/send-alert`.
+- Split frontend (Cloudflare Pages) + backend (Render): set `REACT_APP_SERVER_URL` to the Render URL and rebuild the frontend (push to master to trigger Pages workflow). CORS headers are already allowed in the server.
 
 
 Test endpoints (replace your workers.dev subdomain):
