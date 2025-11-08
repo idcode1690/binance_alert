@@ -21,23 +21,17 @@ export default function ScannerPage({ availableSymbols, fetchExchangeInfo, monit
           mins: typeof p.mins !== 'undefined' ? String(p.mins) : '5',
           ema1: typeof p.ema1 !== 'undefined' ? String(p.ema1) : '26',
           ema2: typeof p.ema2 !== 'undefined' ? String(p.ema2) : '200',
-          conc: typeof p.conc !== 'undefined' ? String(p.conc) : '4',
-          maxConc: typeof p.maxConc !== 'undefined' ? String(p.maxConc) : '8',
-          delay: typeof p.delay !== 'undefined' ? String(p.delay) : '300',
         };
       }
     } catch (e) {}
     // NO parent prop usage here — return fixed defaults to avoid following Alerts values
-    return { mins: '5', ema1: '26', ema2: '200', conc: '4', maxConc: '8', delay: '300' };
+    return { mins: '5', ema1: '26', ema2: '200' };
   }
 
   const initialScanner = readScannerDefaults();
   const [minsStr, setMinsStr] = useState(initialScanner.mins);
   const [ema1Str, setEma1Str] = useState(initialScanner.ema1);
   const [ema2Str, setEma2Str] = useState(initialScanner.ema2);
-  const [concStr, setConcStr] = useState(initialScanner.conc);
-  const [maxConcStr, setMaxConcStr] = useState(initialScanner.maxConc);
-  const [delayStr, setDelayStr] = useState(initialScanner.delay);
 
   // Note: intentionally do NOT re-sync local scanner inputs when parent monitor values change.
   // This keeps Scanner inputs independent from the Alerts/Controls values after initial mount.
@@ -88,9 +82,9 @@ export default function ScannerPage({ availableSymbols, fetchExchangeInfo, monit
     return () => off();
   }, []);
 
-  const saveScannerDefaults = useCallback((mins, ema1, ema2, conc, maxConc, delay) => {
+  const saveScannerDefaults = useCallback((mins, ema1, ema2) => {
     try {
-      const obj = { mins, ema1, ema2, conc, maxConc, delay };
+      const obj = { mins: mins, ema1: ema1, ema2: ema2 };
       localStorage.setItem('scannerDefaults', JSON.stringify(obj));
     } catch (e) {}
   }, []);
@@ -106,23 +100,20 @@ export default function ScannerPage({ availableSymbols, fetchExchangeInfo, monit
       const mins = parseInt(minsStr, 10);
       const ema1 = parseInt(ema1Str, 10);
       const ema2 = parseInt(ema2Str, 10);
-      const conc = parseInt(concStr, 10);
-      const maxConc = parseInt(maxConcStr, 10);
-      const delay = parseInt(delayStr, 10);
       const opts = {
         interval: Number.isFinite(mins) && mins > 0 ? mins : monitorMinutes,
         emaShort: Number.isFinite(ema1) && ema1 > 0 ? ema1 : monitorEma1,
         emaLong: Number.isFinite(ema2) && ema2 > 0 ? ema2 : monitorEma2,
-        // runtime options: allow user-tuned higher parallelism with backoff safety in manager
-        concurrency: Number.isFinite(conc) && conc > 0 ? conc : 4,
-        batchDelay: Number.isFinite(delay) && delay >= 0 ? delay : 300,
-        maxConcurrency: Number.isFinite(maxConc) && maxConc >= 1 ? maxConc : Math.max(4, (Number.isFinite(conc) && conc > 0 ? conc : 4) * 2),
+        // conservative runtime options to avoid hitting API rate limits on start
+        concurrency: 1,
+        batchDelay: 1000,
+        maxConcurrency: 2,
       };
       scannerManager.start('golden', opts);
       // persist scanner choices as defaults
-      saveScannerDefaults(opts.interval, opts.emaShort, opts.emaLong, String(opts.concurrency), String(opts.maxConcurrency), String(opts.batchDelay));
+      saveScannerDefaults(opts.interval, opts.emaShort, opts.emaLong);
     } catch (e) {}
-  }, [minsStr, ema1Str, ema2Str, concStr, maxConcStr, delayStr, monitorMinutes, monitorEma1, monitorEma2, saveScannerDefaults]);
+  }, [minsStr, ema1Str, ema2Str, monitorMinutes, monitorEma1, monitorEma2, saveScannerDefaults]);
 
   const startDead = useCallback(() => {
     try {
@@ -131,23 +122,20 @@ export default function ScannerPage({ availableSymbols, fetchExchangeInfo, monit
       const mins = parseInt(minsStr, 10);
       const ema1 = parseInt(ema1Str, 10);
       const ema2 = parseInt(ema2Str, 10);
-      const conc = parseInt(concStr, 10);
-      const maxConc = parseInt(maxConcStr, 10);
-      const delay = parseInt(delayStr, 10);
       const opts = {
         interval: Number.isFinite(mins) && mins > 0 ? mins : monitorMinutes,
         emaShort: Number.isFinite(ema1) && ema1 > 0 ? ema1 : monitorEma1,
         emaLong: Number.isFinite(ema2) && ema2 > 0 ? ema2 : monitorEma2,
-        // runtime options: allow user-tuned higher parallelism with backoff safety in manager
-        concurrency: Number.isFinite(conc) && conc > 0 ? conc : 4,
-        batchDelay: Number.isFinite(delay) && delay >= 0 ? delay : 300,
-        maxConcurrency: Number.isFinite(maxConc) && maxConc >= 1 ? maxConc : Math.max(4, (Number.isFinite(conc) && conc > 0 ? conc : 4) * 2),
+        // conservative runtime options to avoid hitting API rate limits on start
+        concurrency: 1,
+        batchDelay: 1000,
+        maxConcurrency: 2,
       };
       scannerManager.start('dead', opts);
       // persist scanner choices as defaults
-      saveScannerDefaults(opts.interval, opts.emaShort, opts.emaLong, String(opts.concurrency), String(opts.maxConcurrency), String(opts.batchDelay));
+      saveScannerDefaults(opts.interval, opts.emaShort, opts.emaLong);
     } catch (e) {}
-  }, [minsStr, ema1Str, ema2Str, concStr, maxConcStr, delayStr, monitorMinutes, monitorEma1, monitorEma2, saveScannerDefaults]);
+  }, [minsStr, ema1Str, ema2Str, monitorMinutes, monitorEma1, monitorEma2, saveScannerDefaults]);
   function stopScan() { try { scannerManager.stop(); } catch (e) {} setUiScanType(null); }
 
   // keep UI scan type in sync with manager state when manager finishes or changes
@@ -268,27 +256,6 @@ export default function ScannerPage({ availableSymbols, fetchExchangeInfo, monit
             <input type="number" min="1" value={ema2Str} onChange={(e) => setEma2Str(e.target.value)} onBlur={() => {
               const p = parseInt(ema2Str, 10);
               if (Number.isFinite(p) && p > 0) saveScannerDefaults(parseInt(minsStr, 10) || '', parseInt(ema1Str, 10) || '', p);
-            }} />
-          </label>
-          <label className="control-inline-label">
-            <span className="label-text">Conc</span>
-            <input type="number" min="1" value={concStr} onChange={(e) => setConcStr(e.target.value)} onBlur={() => {
-              const p = parseInt(concStr, 10);
-              if (Number.isFinite(p) && p > 0) saveScannerDefaults(parseInt(minsStr, 10) || '', parseInt(ema1Str, 10) || '', parseInt(ema2Str, 10) || '', concStr, maxConcStr, delayStr);
-            }} />
-          </label>
-          <label className="control-inline-label">
-            <span className="label-text">MaxConc</span>
-            <input type="number" min="1" value={maxConcStr} onChange={(e) => setMaxConcStr(e.target.value)} onBlur={() => {
-              const p = parseInt(maxConcStr, 10);
-              if (Number.isFinite(p) && p > 0) saveScannerDefaults(parseInt(minsStr, 10) || '', parseInt(ema1Str, 10) || '', parseInt(ema2Str, 10) || '', concStr, maxConcStr, delayStr);
-            }} />
-          </label>
-          <label className="control-inline-label">
-            <span className="label-text">Delay(ms)</span>
-            <input type="number" min="0" value={delayStr} onChange={(e) => setDelayStr(e.target.value)} onBlur={() => {
-              const p = parseInt(delayStr, 10);
-              if (Number.isFinite(p) && p >= 0) saveScannerDefaults(parseInt(minsStr, 10) || '', parseInt(ema1Str, 10) || '', parseInt(ema2Str, 10) || '', concStr, maxConcStr, delayStr);
             }} />
           </label>
         </div>
