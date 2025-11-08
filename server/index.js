@@ -3,6 +3,7 @@ const axios = require('axios');
 const WebSocket = require('ws');
 const fs = require('fs');
 const express = require('express');
+const path = require('path');
 
 // SSE clients set for broadcasting server events (telegram_sent, etc.)
 const sseClients = new Set();
@@ -215,6 +216,18 @@ app.post('/send-alert', express.json(), async (req, res) => {
     return res.status(500).json({ ok: false, error: e && e.message });
   }
 });
+
+// Serve React production build when available
+try {
+  const buildDir = path.join(__dirname, '..', 'build');
+  app.use(express.static(buildDir));
+  // fallback to index.html for client-side routing
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(buildDir, 'index.html'));
+  });
+} catch (e) {
+  // ignore if build directory is missing in dev
+}
 
 app.listen(PORT, () => {
   console.log(`Server listening on port ${PORT}`);
