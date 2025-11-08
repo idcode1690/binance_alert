@@ -28,7 +28,28 @@ Security:
 
 If you want, I can also:
 - Commit these files to the repository (already added) and help you set up the GitHub secrets list with exact names and instructions.
-- Add a small example of how to test the worker via curl:
+- Add a small example of how to test the worker via curl.
+
+Always-on server (Render) deployment
+-----------------------------------
+This repo includes a Render blueprint (`render.yaml`) to run the Node/Express server (under `server/`) 24/7.
+
+Steps:
+1. Push this repo to GitHub (done).
+2. Go to Render Dashboard → New + → Blueprint → connect this repo.
+3. Review service settings from `render.yaml`:
+	- rootDir: `server`
+	- build: `npm ci`
+	- start: `node index.js`
+	- health check: `/health`
+4. Add environment variables in Render:
+	- TELEGRAM_BOT_TOKEN
+	- TELEGRAM_CHAT_ID
+5. Create resources. First deploy will start automatically. Render sets `PORT` automatically; the server reads `process.env.PORT`.
+6. Note the public URL, e.g. `https://binance-alert-server.onrender.com`.
+
+Frontend uses `REACT_APP_SERVER_URL` at build time. If you want the app to connect to the Render server for `/events` or `/send-alert`, set the repo secret `REACT_APP_SERVER_URL` to that URL and push to `master` to trigger a new Pages build.
+
 
 Test endpoints (replace your workers.dev subdomain):
 

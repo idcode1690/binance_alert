@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: binance-alert-server
+    runtime: node
+    region: oregon
+    plan: free
+    autoDeploy: true
+    rootDir: server
+    buildCommand: "npm ci"
+    startCommand: "node index.js"
+    envVars:
+      - key: TELEGRAM_BOT_TOKEN
+        value: ""
+      - key: TELEGRAM_CHAT_ID
+        value: ""
+      - key: NODE_ENV
+        value: production
+    healthCheckPath: /health
+    pullRequestPreviewsEnabled: false
