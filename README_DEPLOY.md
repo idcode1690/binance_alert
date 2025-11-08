@@ -35,7 +35,7 @@ Always-on server (Render) deployment
 This repo includes a Render blueprint (`render.yaml`) to run the Node/Express server (under `server/`) 24/7 and serve the React build from `/build`.
 
 What the blueprint does now:
-- Installs dependencies at the project root and builds the React app: `npm ci && npm run build`
+- Installs dependencies at the project root and builds the React app: `npm install && npm run build`
 - Starts the server: `node server/index.js`
 - Health check: `/health`
 

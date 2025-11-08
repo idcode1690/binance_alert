@@ -7,7 +7,8 @@ services:
     autoDeploy: true
     # Removed rootDir so dependencies at project root are installed.
     # Build also runs the React production build so Express can serve /build.
-    buildCommand: "npm ci && npm run build"
+    # Use npm install instead of npm ci to avoid strict lockfile mismatches on Render builders
+    buildCommand: "npm install --no-audit --no-fund && npm run build"
     startCommand: "node server/index.js"
     envVars:
       - key: TELEGRAM_BOT_TOKEN
