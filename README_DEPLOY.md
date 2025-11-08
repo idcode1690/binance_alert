@@ -52,7 +52,7 @@ Deploy steps:
 6. After deploy, note your public URL, e.g. `https://binance-alert-server.onrender.com`.
 
 Usage options:
-- Single service (recommended simple path): open the Render URL above and use the app. No `REACT_APP_SERVER_URL` needed; same-origin calls to `/events` and `/send-alert`.
+- Single service (recommended simple path): open the Render URL above and use the app. The frontend now defaults to `window.location.origin` when `REACT_APP_SERVER_URL` is not set, so same-origin `/events` and `/send-alert` work automatically.
 - Split frontend (Cloudflare Pages) + backend (Render): set `REACT_APP_SERVER_URL` to the Render URL and rebuild the frontend (push to master to trigger Pages workflow). CORS headers are already allowed in the server.
 
 

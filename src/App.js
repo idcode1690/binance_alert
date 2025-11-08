@@ -214,7 +214,17 @@ function App() {
   // the app should run in "client-only" mode (no SSE, no server Telegram relay).
   // Trim the env var to avoid accidental trailing-space issues embedding a bad URL
   const _rawServerUrl = (process.env.REACT_APP_SERVER_URL && typeof process.env.REACT_APP_SERVER_URL === 'string') ? process.env.REACT_APP_SERVER_URL : '';
-  const serverUrl = (_rawServerUrl && _rawServerUrl.trim().length > 0) ? _rawServerUrl.trim() : null;
+  // Default to same-origin when env var isn't provided so a single Render service works out of the box
+  const serverUrl = (() => {
+    const trimmed = (_rawServerUrl || '').trim();
+    if (trimmed.length > 0) return trimmed;
+    try {
+      if (typeof window !== 'undefined' && window.location && window.location.origin) {
+        return window.location.origin;
+      }
+    } catch (e) {}
+    return null;
+  })();
 
   // Debug helper: simulate a confirmed cross from the frontend (calls /send-alert and adds local event)
   const simulateConfirmedCross = React.useCallback((forceType) => {
