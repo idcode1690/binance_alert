@@ -56,6 +56,47 @@ Usage options:
 - Split frontend (Cloudflare Pages) + backend (Render): set `REACT_APP_SERVER_URL` to the Render URL and rebuild the frontend (push to master to trigger Pages workflow). CORS headers are already allowed in the server.
 
 
+Render redeploy steps (clear cache + verify)
+-------------------------------------------
+When build/start commands or dependencies change, redeploy like this:
+
+1) In Render Dashboard → your Web Service → Settings → Build & Deploy → click "Clear build cache".
+2) Click "Manual Deploy" → "Deploy latest commit" (or push to master to auto-deploy).
+3) Confirm the service type is "Web Service" (not "Static Site").
+4) In "Environment" ensure:
+	 - Build Command: `npm install --no-audit --no-fund && npm run build`
+	 - Start Command: `node server/index.js`
+	 - Health Check Path: `/health`
+5) After deploy:
+	 - Open https://<your-service>.onrender.com/health — expect JSON `{ ok: true, symbol, lastPrice }`.
+	 - Open https://<your-service>.onrender.com/ — React app should load. The app will call same-origin `/events` and `/send-alert`.
+
+Windows PowerShell quick checks (optional):
+
+```
+# Health check
+Invoke-WebRequest -Uri "https://<your-service>.onrender.com/health" -UseBasicParsing | Select-Object -ExpandProperty Content
+
+# Send alert (requires TELEGRAM_* envs set in Render)
+Invoke-RestMethod -Method Post -Uri "https://<your-service>.onrender.com/send-alert" -Headers @{"Content-Type"="application/json"} -Body (
+	'{"symbol":"BTCUSDT","message":"Bull cross","price":100000,"emaShort":9,"emaLong":26}'
+)
+```
+
+Troubleshooting
+---------------
+- 404 with header `x-render-routing: no-server`:
+	- The server did not start. Check Start Command and service logs. Ensure type is Web Service.
+- Build fails with `npm ci` lockfile EUSAGE:
+	- Use `npm install` (already set in `render.yaml`). Clear cache and redeploy.
+- SPA 404 on routes like `/alerts`:
+	- `server/index.js` serves the React build with a catch-all to `index.html`. Ensure the build step completed and `build/` exists.
+- CORS or cross-origin issues:
+	- Single service mode needs no `REACT_APP_SERVER_URL`. If frontend is hosted elsewhere, set `REACT_APP_SERVER_URL` to the Render URL and rebuild frontend.
+- Health check failing intermittently:
+	- Binance connectivity can be transient. The health JSON still returns `ok: true` even while initializing; `lastPrice` appears after initial fetch or first ws message.
+
+
 Test endpoints (replace your workers.dev subdomain):
 
 ```
