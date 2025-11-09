@@ -9,7 +9,7 @@ export const onRequestPost = async (context) => {
     const botToken = env && env.TELEGRAM_BOT_TOKEN ? String(env.TELEGRAM_BOT_TOKEN) : '';
     const chatId = env && env.TELEGRAM_CHAT_ID ? String(env.TELEGRAM_CHAT_ID) : '';
     if (!botToken || !chatId) {
-      return new Response(JSON.stringify({ ok: false, error: 'telegram_not_configured' }), { status: 400, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
+      return new Response(JSON.stringify({ ok: false, error: 'telegram_not_configured' }), { status: 400, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' } });
     }
     const symbol = (body.symbol || '').toString().toUpperCase();
     const price = typeof body.price !== 'undefined' ? body.price : '';
@@ -25,9 +25,22 @@ export const onRequestPost = async (context) => {
       body: JSON.stringify({ chat_id: chatId, text }),
     });
     const result = await tg.json().catch(() => null);
-    if (!tg.ok) return new Response(JSON.stringify({ ok: false, error: 'telegram_api_failed', detail: result }), { status: 502, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
-    return new Response(JSON.stringify({ ok: true, sent: text, telegram: result }), { status: 200, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
+    if (!tg.ok) return new Response(JSON.stringify({ ok: false, error: 'telegram_api_failed', detail: result }), { status: 502, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' } });
+    return new Response(JSON.stringify({ ok: true, sent: text, telegram: result }), { status: 200, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' } });
   } catch (err) {
-    return new Response(JSON.stringify({ ok: false, error: 'telegram_exception', detail: String(err) }), { status: 500, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
+    return new Response(JSON.stringify({ ok: false, error: 'telegram_exception', detail: String(err) }), { status: 500, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' } });
   }
+};
+
+// Explicit CORS preflight support for cross-origin POST from GitHub Pages
+export const onRequestOptions = async () => {
+  return new Response(null, {
+    status: 204,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Vary': 'Origin',
+    },
+  });
 };

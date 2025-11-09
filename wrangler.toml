@@ -1,6 +1,9 @@
-# Root Wrangler config for Cloudflare Pages Functions local dev
-# This removes compatibility date warnings.
+# Root Wrangler config for Cloudflare Pages
+# This removes compatibility date warnings and declares Pages output dir for CI autodetect.
 compatibility_date = "2025-08-16"
+
+# Required for Cloudflare Pages build system (v2 root strategy)
+pages_build_output_dir = "build"
 
 # Optional future flags (uncomment if needed)
 # compatibility_flags = ["nodejs_compat"]

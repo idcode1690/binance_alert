@@ -32,6 +32,9 @@ jobs:
 
       - name: Build React app
         run: npm run build
+        env:
+          # Set this repo secret to your Cloudflare Pages domain, e.g. https://<project>.pages.dev
+          REACT_APP_SERVER_URL: ${{ secrets.REACT_APP_SERVER_URL }}
 
       - name: Add 404.html fallback for SPA routing
         run: cp build/index.html build/404.html

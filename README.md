@@ -77,6 +77,31 @@ Returns `{ ok: true, sent: "..." }` on success.
 ## GitHub Pages Alternative
 You can deploy the static build to GitHub Pages (workflow already exists) but Telegram relay will not work unless you keep Cloudflare Pages Functions or a Worker. Avoid exposing bot tokens directly in client code.
 
+### GitHub Pages Only Mode (선택: Cloudflare Functions 미사용)
+`https://idcode1690.github.io/binance_alert/` 와 같이 GitHub Pages 도메인만 사용할 경우:
+
+- 동작: 실시간 EMA 계산, 알림(브라우저 Notification + 소리), 심볼 스캐너 등은 100% 클라이언트에서만 수행됩니다.
+- 미지원: Telegram 전송(`/send-alert`), 서버 제공 가격 캐시(`/price`), 헬스체크(`/health`). 이 엔드포인트들은 Cloudflare Pages Functions 가 있어야 합니다.
+- 보안 이유: Telegram BOT 토큰을 클라이언트 코드에 직접 넣지 마세요. 공개 저장소/브라우저 번들에 노출됩니다.
+- 장점: 가장 단순한 구성 (정적 배포만), 유지비/추가 설정 최소화.
+- 단점: 서버 사이드 알림 릴레이 없음, 봇 토큰 보안 처리 불가, 향후 서버 확장(예: 사용자별 alert 저장) 어려움.
+
+GitHub Pages Only 모드에서 Telegram 기능을 쓰고 싶다면 다음 중 하나를 선택하세요:
+1. Cloudflare Pages Functions 프로젝트(커스텀 도메인 불필요, 기본 `*.pages.dev` 사용)를 추가로 유지하고 프론트엔드에서 해당 도메인을 호출.
+2. 별도 서버(예: VPS, 렌더 등) 재도입 — 프로젝트 목표가 단순화인 경우 권장하지 않음.
+
+#### 프론트엔드가 Cloudflare Pages Functions 호출하도록 설정 (혼합 모드)
+Cloudflare Pages 를 Functions 용으로만 쓰고, 정적 사이트는 GitHub Pages 에서 제공하려면:
+1. Cloudflare Pages 프로젝트 생성 (빌드 명령/디렉터리 동일: `npm run build`, `build`).
+2. Secrets 설정: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
+3. 첫 배포 후 Functions 도메인 확인: 예) `https://<project>.pages.dev`.
+4. GitHub Pages 쪽 `.env` (또는 Actions 환경변수) 에 `REACT_APP_SERVER_URL=https://<project>.pages.dev` 추가 후 다시 빌드/배포.
+5. 브라우저 콘솔에서 `POST https://<project>.pages.dev/send-alert` 호출/응답 OK 확인.
+
+설정을 하지 않으면 앱 내부에서 `serverUrl` 이 null 로 판단되어 Telegram 관련 호출을 자동으로 건너뛰고 토스트에 "Telegram disabled" 가 표시됩니다.
+
+> 요약: GitHub Pages 만 사용 → 클라이언트 순수 모드. Telegram 필요 → Cloudflare Pages Functions 도메인 추가 후 환경변수로 연결.
+
 ## 제거된 구성 요소 (Legacy Removed)
 프로젝트 단순화를 위해 다음 항목을 완전히 삭제했습니다:
 - 기존 Node/Express 서버 디렉터리 `server/` (Dockerfile, index.js, utils 등)
