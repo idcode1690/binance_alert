@@ -1,5 +1,5 @@
 # Root Wrangler config for Cloudflare Pages
-name = "binance-alert"
+# This removes compatibility date warnings and declares Pages output dir for CI autodetect.
 compatibility_date = "2025-08-16"
 
 # Required for Cloudflare Pages build system (v2 root strategy)

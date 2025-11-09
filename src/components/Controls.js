@@ -36,16 +36,6 @@ export default function Controls(props) {
   const [ema1Str, setEma1Str] = useState(String(monitorEma1 ?? ''));
   const [ema2Str, setEma2Str] = useState(String(monitorEma2 ?? ''));
   const [confirmStr, setConfirmStr] = useState(String(monitorConfirm ?? ''));
-  // Feature flag: show operational buttons (Set Server URL / Test Telegram)
-  // Default: hidden. Enable via REACT_APP_SHOW_SERVER_BUTTONS=1 or localStorage.showOpsButtons=1
-  const showOpsButtons = (() => {
-    try {
-      if (String(process.env.REACT_APP_SHOW_SERVER_BUTTONS || '') === '1') return true;
-      const ls = (typeof localStorage !== 'undefined') ? localStorage.getItem('showOpsButtons') : null;
-      if (ls === '1') return true;
-    } catch (e) {}
-    return false;
-  })();
 
   // keep local strings in sync if parent updates (e.g., persisted restore)
   useEffect(() => { setMinsStr(String(monitorMinutes ?? '')); }, [monitorMinutes]);
@@ -153,46 +143,42 @@ export default function Controls(props) {
 
       <button className="secondary" onClick={() => disconnect()}>Stop</button>
 
-      {showOpsButtons && (
-        <>
-          <button className="secondary" style={{marginLeft:8}}
-            title="Set Cloudflare Worker URL for Telegram relay"
-            onClick={() => {
-              try {
-                const cur = (typeof localStorage !== 'undefined') ? (localStorage.getItem('serverUrl') || '') : '';
-                const v = window.prompt('Set Worker URL (e.g. https://<name>.workers.dev)', cur);
-                if (v == null) return;
-                const trimmed = String(v).trim();
-                if (trimmed) localStorage.setItem('serverUrl', trimmed);
-                else localStorage.removeItem('serverUrl');
-                window.location.reload();
-              } catch (e) {}
-            }}>
-            Set Server URL
-          </button>
+      <button className="secondary" style={{marginLeft:8}}
+        title="Set Cloudflare Worker URL for Telegram relay"
+        onClick={() => {
+          try {
+            const cur = (typeof localStorage !== 'undefined') ? (localStorage.getItem('serverUrl') || '') : '';
+            const v = window.prompt('Set Worker URL (e.g. https://<name>.workers.dev)', cur);
+            if (v == null) return;
+            const trimmed = String(v).trim();
+            if (trimmed) localStorage.setItem('serverUrl', trimmed);
+            else localStorage.removeItem('serverUrl');
+            window.location.reload();
+          } catch (e) {}
+        }}>
+        Set Server URL
+      </button>
 
-          <button className="secondary" style={{marginLeft:8}}
-            title="Send a test Telegram message via /send-alert"
-            onClick={async () => {
-              try {
-                const serverUrl = (() => {
-                  try { const s = localStorage.getItem('serverUrl') || ''; if (s) return s.replace(/\/$/, ''); } catch (e) {}
-                  return '';
-                })();
-                if (!serverUrl) { alert('No serverUrl set. Click Set Server URL first.'); return; }
-                const sym = (symbol || '').toString().replace(/[^A-Za-z0-9]/g,'').toUpperCase() || 'TESTUSDT';
-                const payload = { symbol: sym, message: `[TEST] manual send from UI`, emaShort: Number(monitorEma1)||26, emaLong: Number(monitorEma2)||200 };
-                const res = await fetch(`${serverUrl}/send-alert`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-                const json = await res.json().catch(() => null);
-                alert(`send-alert ${res.ok ? 'OK' : 'FAIL'} (${res.status})\n${JSON.stringify(json)}`);
-              } catch (e) {
-                alert('send-alert error: ' + String(e));
-              }
-            }}>
-            Test Telegram
-          </button>
-        </>
-      )}
+      <button className="secondary" style={{marginLeft:8}}
+        title="Send a test Telegram message via /send-alert"
+        onClick={async () => {
+          try {
+            const serverUrl = (() => {
+              try { const s = localStorage.getItem('serverUrl') || ''; if (s) return s.replace(/\/$/, ''); } catch (e) {}
+              return '';
+            })();
+            if (!serverUrl) { alert('No serverUrl set. Click Set Server URL first.'); return; }
+            const sym = (symbol || '').toString().replace(/[^A-Za-z0-9]/g,'').toUpperCase() || 'TESTUSDT';
+            const payload = { symbol: sym, message: `[TEST] manual send from UI`, emaShort: Number(monitorEma1)||26, emaLong: Number(monitorEma2)||200 };
+            const res = await fetch(`${serverUrl}/send-alert`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            const json = await res.json().catch(() => null);
+            alert(`send-alert ${res.ok ? 'OK' : 'FAIL'} (${res.status})\n${JSON.stringify(json)}`);
+          } catch (e) {
+            alert('send-alert error: ' + String(e));
+          }
+        }}>
+        Test Telegram
+      </button>
 
       {/* removed Auto-start and Debug checkboxes as requested */}
 
