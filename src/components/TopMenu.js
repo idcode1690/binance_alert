@@ -7,7 +7,7 @@ export default function TopMenu({ onNavigate, view, darkMode, toggleDark }) {
         <div style={{display: 'flex', gap: 8, justifyContent: 'flex-start', alignItems: 'center'}}>
           <button className={`menu-btn ${view === 'alerts' ? 'active' : ''}`} onClick={() => onNavigate && onNavigate('alerts')}>Alerts</button>
           <button className={`menu-btn ${view === 'scanner' ? 'active' : ''}`} onClick={() => onNavigate && onNavigate('scanner')}>Scanner</button>
-          <button className={`menu-btn ${view === 'server' ? 'active' : ''}`} onClick={() => onNavigate && onNavigate('server')}>Server Settings</button>
+          {/* Server Settings removed per request */}
         </div>
         <div style={{display: 'flex', alignItems: 'center', gap: 12}}>
           <button className={`menu-btn theme-toggle ${darkMode ? 'active' : ''}`} onClick={() => toggleDark && toggleDark()} title={darkMode ? 'Light mode' : 'Dark mode'} aria-pressed={!!darkMode}>
