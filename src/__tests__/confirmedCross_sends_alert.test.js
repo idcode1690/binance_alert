@@ -27,6 +27,7 @@ import App from '../App';
 const originalFetch = global.fetch;
 beforeEach(() => {
   process.env.REACT_APP_SERVER_URL = 'https://binance-alert.idcode1690.workers.dev';
+  process.env.REACT_APP_SHOW_SERVER_BUTTONS = '1';
   // Provide localStorage with serverUrl override so App picks it immediately
   Object.defineProperty(window, 'localStorage', {
     value: {
