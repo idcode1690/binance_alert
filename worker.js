@@ -287,6 +287,7 @@ const workerExport = {
       return new Response(
         JSON.stringify({
           ok: true,
+          version: 'worker-routes-v2',
           routes: {
             health: 'GET /health',
             price: 'GET /price?symbol=BTCUSDT',
@@ -295,7 +296,8 @@ const workerExport = {
             postConfig: 'POST /config',
             getSymbols: 'GET /symbols',
             postSymbols: 'POST /symbols',
-            scanState: 'GET /scan-state'
+            scanState: 'GET /scan-state',
+            scanNow: 'POST /scan-now'
           },
         }),
         { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders() } }
