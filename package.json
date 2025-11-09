@@ -21,6 +21,8 @@
     "build": "react-scripts build",
     "test": "react-scripts test",
     "pages:dev": "npx wrangler pages dev ./build",
+    "worker:deploy": "wrangler deploy -c wrangler.worker.toml",
+    "worker:dev": "wrangler dev -c wrangler.worker.toml",
     "eject": "react-scripts eject"
   },
   "eslintConfig": {
