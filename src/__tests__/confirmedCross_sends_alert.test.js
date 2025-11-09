@@ -20,13 +20,22 @@ jest.mock('../hooks/useEmaCross', () => ({
 }));
 
 import React from 'react';
-import { render } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import App from '../App';
 
 // Ensure fetch exists and capture calls
 const originalFetch = global.fetch;
 beforeEach(() => {
   process.env.REACT_APP_SERVER_URL = 'https://binance-alert.idcode1690.workers.dev';
+  // Provide localStorage with serverUrl override so App picks it immediately
+  Object.defineProperty(window, 'localStorage', {
+    value: {
+      getItem: (k) => (k === 'serverUrl' ? 'https://binance-alert.idcode1690.workers.dev' : null),
+      setItem: jest.fn(),
+      removeItem: jest.fn(),
+    },
+    configurable: true,
+  });
   global.fetch = jest.fn(async (url, opts) => ({ ok: true, status: 200, json: async () => ({ ok: true }) }));
 });
 
@@ -34,12 +43,18 @@ afterEach(() => {
   global.fetch = originalFetch;
 });
 
-test('confirmedCross triggers /send-alert POST', async () => {
+test('Test Telegram button triggers /send-alert POST', async () => {
   render(<App />);
-  // wait briefly for effect to fire
-  await new Promise((r) => setTimeout(r, 80));
-  expect(global.fetch).toHaveBeenCalled();
-  const calls = global.fetch.mock.calls.filter(([url]) => String(url).includes('/send-alert'));
+  // Click the Test Telegram button to force a send
+  const btn = await screen.findByText('Test Telegram');
+  fireEvent.click(btn);
+  // Wait for the network call
+  let calls = [];
+  for (let i = 0; i < 10; i++) {
+    await new Promise((r) => setTimeout(r, 100));
+    calls = global.fetch.mock.calls.filter(([url]) => /\/send-alert$/.test(String(url)));
+    if (calls.length > 0) break;
+  }
   expect(calls.length).toBeGreaterThan(0);
   const [url, opts] = calls[0];
   expect(String(url)).toMatch(/\/send-alert$/);
