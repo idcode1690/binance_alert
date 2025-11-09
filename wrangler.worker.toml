@@ -1,0 +1,5 @@
+name = "binance-alert"
+main = "worker.js"
+compatibility_date = "2025-08-16"
+
+workers_dev = true

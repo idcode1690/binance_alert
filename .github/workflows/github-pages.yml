@@ -27,8 +27,8 @@ jobs:
           node-version: '18'
           cache: 'npm'
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Install dependencies (use npm install to avoid lock mismatch)
+        run: npm install
 
       - name: Build React app
         run: npm run build
@@ -38,6 +38,9 @@ jobs:
 
       - name: Add 404.html fallback for SPA routing
         run: cp build/index.html build/404.html
+
+      - name: Ensure .nojekyll to prevent Jekyll processing
+        run: echo > build/.nojekyll
 
       - name: Upload build artifact
         uses: actions/upload-pages-artifact@v3
