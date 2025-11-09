@@ -1,0 +1,56 @@
+name: Render Health Check
+
+on:
+  schedule:
+    - cron: "0 * * * *" # hourly
+  workflow_dispatch:
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Render URL (skip if missing)
+        run: |
+          if [ -z "${RENDER_URL}" ]; then
+            echo "RENDER_URL not provided (add repository secret). Skipping.";
+            exit 0;
+          fi
+          echo "Pinging $RENDER_URL/health"
+          status=$(curl -s -o /tmp/health.json -w "%{http_code}" "$RENDER_URL/health" || true)
+          echo "Status: $status"; cat /tmp/health.json || true
+          if [ "$status" != "200" ]; then echo "Health check failed"; exit 1; fi
+          grep -q '"ok":' /tmp/health.json || { echo "Missing ok field"; exit 1; }
+          echo "Health check passed.";
+        env:
+          RENDER_URL: ${{ secrets.RENDER_URL }}name: Render Health Check
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Render health endpoint
+        run: |
+          # RENDER_URL should be provided as an Actions secret (Settings -> Secrets -> Actions -> New secret)
+          # Example value: https://binance-alert-server.onrender.com
+          if [ -z "${{ secrets.RENDER_URL }}" ]; then
+            echo "RENDER_URL secret not set; skipping health check.";
+            exit 0;
+          fi
+          RENDER_URL='${{ secrets.RENDER_URL }}'
+          echo "Pinging $RENDER_URL/health"
+          status=$(curl -s -o /tmp/health.json -w "%{http_code}" "$RENDER_URL/health" || true)
+          echo "HTTP status: $status"
+          cat /tmp/health.json || true
+          if [ "$status" != "200" ]; then
+            echo "Health check failed (status $status)";
+            exit 1;
+          fi
+          grep -q '"ok":' /tmp/health.json || { echo "Missing ok field"; exit 1; }
+          grep -q '"symbol":' /tmp/health.json || { echo "Missing symbol field"; exit 1; }
+          echo "Health check passed."
+            exit 1;
+          fi
+          # simple JSON key presence check
+          grep -q '"ok":' /tmp/health.json || { echo "Missing ok field"; exit 1; }
+          grep -q '"symbol":' /tmp/health.json || { echo "Missing symbol field"; exit 1; }
+          echo "Health check passed."
