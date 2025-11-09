@@ -1,12 +1,11 @@
 import React, { useEffect, useState, useCallback } from 'react';
 
-// 간단한 서버 설정 관리 페이지
-// 기능:
-//  - 현재 /config, /symbols, /scan-state 조회
-//  - interval, emaShort, emaLong, scanType 수정 후 저장
-//  - 심볼 목록 추가/교체
-//  - 최근 매칭 테이블 표시
-// REACT_APP_SERVER_URL 환경변수 또는 window.location.origin 사용 (App과 동일 로직 필요시 props로 전달 가능)
+// 서버 설정 / 상태 / 심볼 관리 페이지
+// 포함 기능 (요청 순서 1~4 구현):
+// 1. 스캔 메타데이터(lastScanDuration, scannedCount, newMatches) 저장 및 표시
+// 2. /scan-now 수동 스캔 트리거 버튼
+// 3. 최근 매치 테이블 (최대 20개)
+// 4. Telegram 테스트 버튼 (/send-alert 사용)
 
 export default function ServerSettingsPage() {
   const raw = (process.env.REACT_APP_SERVER_URL && typeof process.env.REACT_APP_SERVER_URL === 'string') ? process.env.REACT_APP_SERVER_URL : '';
@@ -23,7 +22,7 @@ export default function ServerSettingsPage() {
 
   const showMsg = useCallback((msg, ok = true) => {
     setMessage({ msg, ok, ts: Date.now() });
-    setTimeout(() => { setMessage(null); }, 5000);
+    setTimeout(() => { setMessage(null); }, 4500);
   }, []);
 
   const fetchAll = useCallback(async () => {
@@ -40,18 +39,12 @@ export default function ServerSettingsPage() {
       const sJson = await sRes.json().catch(() => null);
       const stJson = await stRes.json().catch(() => null);
       const hJson = await hRes.json().catch(() => null);
-      if (cJson && cJson.ok && cJson.config) {
-        setCfg(cJson.config);
-        setForm(cJson.config);
-      }
+      if (cJson && cJson.ok && cJson.config) { setCfg(cJson.config); setForm(cJson.config); }
       if (sJson && sJson.ok && Array.isArray(sJson.symbols)) setSymbols(sJson.symbols);
       if (stJson && stJson.ok && stJson.state) setState(stJson.state);
       if (hJson && (hJson.ok || typeof hJson.telegramConfigured !== 'undefined')) setHealth(hJson);
-    } catch (e) {
-      showMsg('설정 조회 실패: ' + String(e), false);
-    } finally {
-      setLoading(false);
-    }
+    } catch (e) { showMsg('설정 조회 실패: ' + String(e), false); }
+    finally { setLoading(false); }
   }, [serverUrl, showMsg]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
@@ -60,29 +53,23 @@ export default function ServerSettingsPage() {
     if (!serverUrl) return;
     try {
       const body = { ...form };
-      // interval 숫자면 m 붙이기
       if (typeof body.interval === 'number' || /^\d+$/.test(String(body.interval))) body.interval = `${body.interval}m`;
       const res = await fetch(`${serverUrl}/config`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       const j = await res.json().catch(() => null);
-      if (res.ok && j && j.ok) {
-        setCfg(j.config);
-        showMsg('설정 저장 완료');
-      } else showMsg('설정 저장 실패', false);
+      if (res.ok && j && j.ok) { setCfg(j.config); showMsg('설정 저장 완료'); }
+      else showMsg('설정 저장 실패', false);
     } catch (e) { showMsg('설정 오류: ' + String(e), false); }
   };
 
   const saveSymbols = async () => {
     if (!serverUrl) return;
     try {
-      // 쉼표/공백 구분해서 배열화
       let arr = symbolsInput.split(/[\s,]+/).map(s => s.trim()).filter(Boolean);
       if (!arr.length) { showMsg('심볼 입력이 비어있습니다', false); return; }
       const res = await fetch(`${serverUrl}/symbols`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(arr) });
       const j = await res.json().catch(() => null);
-      if (res.ok && j && j.ok) {
-        setSymbols(j.symbols);
-        showMsg('심볼 저장 완료');
-      } else showMsg('심볼 저장 실패', false);
+      if (res.ok && j && j.ok) { setSymbols(j.symbols); showMsg('심볼 저장 완료'); }
+      else showMsg('심볼 저장 실패', false);
     } catch (e) { showMsg('심볼 오류: ' + String(e), false); }
   };
 
@@ -91,19 +78,14 @@ export default function ServerSettingsPage() {
     try {
       const res = await fetch(`${serverUrl}/symbols`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(arr) });
       const j = await res.json().catch(() => null);
-      if (res.ok && j && j.ok) {
-        setSymbols(j.symbols);
-        showMsg('심볼 저장 완료');
-      } else showMsg('심볼 저장 실패', false);
+      if (res.ok && j && j.ok) { setSymbols(j.symbols); showMsg('심볼 저장 완료'); }
+      else showMsg('심볼 저장 실패', false);
     } catch (e) { showMsg('심볼 오류: ' + String(e), false); }
   };
 
   const removeSymbol = async (sym) => {
-    try {
-      const next = (symbols || []).filter(s => s !== sym);
-      setSymbols(next);
-      await saveSymbolsArray(next);
-    } catch (e) { showMsg('삭제 실패: ' + String(e), false); }
+    try { const next = symbols.filter(s => s !== sym); setSymbols(next); await saveSymbolsArray(next); }
+    catch (e) { showMsg('삭제 실패: ' + String(e), false); }
   };
 
   const runScanNow = async () => {
@@ -111,13 +93,21 @@ export default function ServerSettingsPage() {
     try {
       const res = await fetch(`${serverUrl}/scan-now`, { method: 'POST' });
       const j = await res.json().catch(() => null);
-      if (res.ok && j) {
-        showMsg(`수동 스캔 완료 (count=${j.count ?? 0})`);
-        await refreshState();
-      } else {
-        showMsg('수동 스캔 실패', false);
-      }
+      if (res.ok && j) { showMsg(`수동 스캔 완료 (count=${j.count ?? 0})`); await refreshState(); }
+      else showMsg('수동 스캔 실패', false);
     } catch (e) { showMsg('수동 스캔 오류: ' + String(e), false); }
+  };
+
+  const testTelegram = async () => {
+    if (!serverUrl) return;
+    try {
+      const res = await fetch(`${serverUrl}/send-alert`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ symbol: 'TEST', message: '텔레그램 테스트', emaShort: form.emaShort, emaLong: form.emaLong })
+      });
+      const j = await res.json().catch(() => null);
+      if (res.ok && j && j.ok) showMsg('텔레그램 전송 성공'); else showMsg('텔레그램 전송 실패', false);
+    } catch (e) { showMsg('텔레그램 오류: ' + String(e), false); }
   };
 
   const refreshState = async () => {
@@ -125,10 +115,8 @@ export default function ServerSettingsPage() {
     try {
       const res = await fetch(`${serverUrl}/scan-state`);
       const j = await res.json().catch(() => null);
-      if (res.ok && j && j.ok) {
-        setState(j.state);
-        showMsg('상태 새로고침 완료');
-      } else showMsg('상태 조회 실패', false);
+      if (res.ok && j && j.ok) { setState(j.state); showMsg('상태 새로고침 완료'); }
+      else showMsg('상태 조회 실패', false);
     } catch (e) { showMsg('상태 오류: ' + String(e), false); }
   };
 
@@ -136,12 +124,16 @@ export default function ServerSettingsPage() {
     <div className="server-settings-page">
       <h2>Server Settings</h2>
       {!serverUrl && <div className="warning">서버 URL이 설정되지 않았습니다. REACT_APP_SERVER_URL 시크릿을 확인하세요.</div>}
-      {message && (
-        <div className={`ss-toast ${message.ok ? 'ok' : 'err'}`}>{message.msg}</div>
-      )}
+      {message && <div className={`ss-toast ${message.ok ? 'ok' : 'err'}`}>{message.msg}</div>}
+
       <div className="section">
-        <h3>현재 설정</h3>
+        <h3>현재 설정 & 상태</h3>
         {loading && <div className="loading">불러오는 중...</div>}
+        <div className="btn-row" style={{display:'flex', gap:8, flexWrap:'wrap'}}>
+          <button onClick={refreshState}>새로고침</button>
+          <button onClick={runScanNow}>수동 스캔 실행</button>
+          <button onClick={testTelegram}>Telegram 테스트</button>
+        </div>
         {cfg && (
           <div className="cfg-view">
             <div>interval: <strong>{cfg.interval}</strong></div>
@@ -157,13 +149,44 @@ export default function ServerSettingsPage() {
             <div>server time: {health.time ? new Date(health.time).toLocaleString() : '—'}</div>
           </div>
         )}
+        {state && (
+          <div className="scan-meta">
+            <div>lastRun: {state.lastRun ? new Date(state.lastRun).toLocaleString() : '—'}</div>
+            <div>lastError: {state.lastError || '없음'}</div>
+            <div>matches stored: {Array.isArray(state.matches) ? state.matches.length : 0}</div>
+            <div>lastScanDuration: {typeof state.lastScanDuration === 'number' ? `${state.lastScanDuration} ms` : '—'}</div>
+            <div>scannedCount: {typeof state.scannedCount === 'number' ? state.scannedCount : '—'}</div>
+            <div>newMatches(last run): {typeof state.newMatches === 'number' ? state.newMatches : '—'}</div>
+          </div>
+        )}
+        {state && Array.isArray(state.matches) && state.matches.length > 0 && (
+          <div className="matches">
+            <h4>최근 매치 (최대 20)</h4>
+            <table className="matches-table">
+              <thead>
+              <tr><th>Symbol</th><th>Type</th><th>Time</th><th>Interval</th><th>EMA</th></tr>
+              </thead>
+              <tbody>
+              {state.matches.slice(0, 20).map((m,i) => (
+                <tr key={m.symbol + m.time + i}>
+                  <td>{m.symbol}</td>
+                  <td>{m.type}</td>
+                  <td>{m.time ? new Date(m.time).toLocaleString() : '—'}</td>
+                  <td>{m.interval}</td>
+                  <td>{`S${m.emaShort}/L${m.emaLong}`}</td>
+                </tr>
+              ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       <div className="section">
         <h3>설정 변경</h3>
         <div className="form-row">
-          <label>Interval (분 혹은 "5m")</label>
-          <input value={form.interval} onChange={e => setForm(f => ({ ...f, interval: e.target.value }))} placeholder="5m" />
+          <label>Interval (예: 5m)</label>
+          <input value={form.interval} onChange={e => setForm(f => ({ ...f, interval: e.target.value }))} />
         </div>
         <div className="form-row">
           <label>EMA Short</label>
@@ -183,7 +206,7 @@ export default function ServerSettingsPage() {
         </div>
         <div className="form-row">
           <label>Cooldown (minutes)</label>
-          <input type="number" min="1" value={form.crossCooldownMinutes ?? 30} onChange={e => setForm(f => ({ ...f, crossCooldownMinutes: Number(e.target.value) }))} />
+          <input type="number" min={1} value={form.crossCooldownMinutes ?? 30} onChange={e => setForm(f => ({ ...f, crossCooldownMinutes: Number(e.target.value) }))} />
         </div>
         <button className="primary" onClick={saveConfig}>저장 (Config)</button>
       </div>
@@ -191,14 +214,11 @@ export default function ServerSettingsPage() {
       <div className="section">
         <h3>심볼 목록</h3>
         <div className="symbols-box">
-          {symbols && symbols.length ? symbols.map(s => (
-            <span key={s} className="sym-chip">
-              {s}
-              <button className="chip-x" aria-label={`remove ${s}`} onClick={() => removeSymbol(s)}>×</button>
-            </span>
+          {symbols.length ? symbols.map(s => (
+            <span key={s} className="sym-chip">{s} <button className="chip-x" onClick={() => removeSymbol(s)}>×</button></span>
           )) : <em>없음</em>}
         </div>
-        <textarea value={symbolsInput} onChange={e => setSymbolsInput(e.target.value)} placeholder="BTCUSDT ETHUSDT ..." rows={3} />
+        <textarea rows={3} placeholder="BTCUSDT ETHUSDT ..." value={symbolsInput} onChange={e => setSymbolsInput(e.target.value)} />
         <div style={{display:'flex', gap:8}}>
           <button onClick={saveSymbols}>심볼 저장 (입력값)</button>
           <button onClick={() => saveSymbolsArray(symbols)}>현재 심볼 저장</button>
@@ -206,47 +226,12 @@ export default function ServerSettingsPage() {
       </div>
 
       <div className="section">
-        <h3>스캔 상태</h3>
-        <div style={{display:'flex', gap:8}}>
-          <button onClick={refreshState}>새로고침</button>
-          <button onClick={runScanNow}>수동 스캔 실행</button>
-        </div>
-        {state && (
-          <div className="state-info">
-            <div>lastRun: {state.lastRun ? new Date(state.lastRun).toLocaleString() : '—'}</div>
-            <div>lastError: {state.lastError || '없음'}</div>
-            <div>matches: {Array.isArray(state.matches) ? state.matches.length : 0}</div>
-            {Array.isArray(state.matches) && state.matches.length > 0 && (
-              <table className="matches-table">
-                <thead>
-                  <tr>
-                    <th>시간</th><th>심볼</th><th>타입</th><th>Interval</th><th>EMA</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {state.matches.map((m, i) => (
-                    <tr key={m.symbol + m.time + i}>
-                      <td>{new Date(m.time).toLocaleString()}</td>
-                      <td>{m.symbol}</td>
-                      <td>{m.type}</td>
-                      <td>{m.interval}</td>
-                      <td>{`S${m.emaShort}/L${m.emaLong}`}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        )}
-      </div>
-
-      <div className="section">
         <h3>도움말</h3>
         <ul className="help-list">
-          <li>프론트에서 설정 저장 후 종료해도 서버 Cron이 계속 스캔합니다.</li>
-          <li>심볼은 USDT 선물 마켓 심볼만 인식합니다 (정규식 /USDT$/).</li>
-          <li>동일 심볼/타입 교차는 30분 내 중복 텔레그램 전송을 방지합니다.</li>
-          <li>텔레그램 설정이 없으면 매칭은 저장되지만 메시지는 전송되지 않습니다.</li>
+          <li>서버 Cron으로 백그라운드 스캔이 계속 동작합니다.</li>
+          <li>심볼은 USDT로 끝나는 선물 마켓 심볼만 유효합니다.</li>
+          <li>Cooldown 내 동일 교차는 텔레그램 중복 전송 방지.</li>
+          <li>텔레그램 미설정 시 매치만 저장되고 전송은 생략됩니다.</li>
         </ul>
       </div>
     </div>

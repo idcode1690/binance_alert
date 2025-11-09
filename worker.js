@@ -189,6 +189,7 @@ async function runScanOnce(env) {
   const cooldownMs = Math.max(1, parseInt(cfg.crossCooldownMinutes, 10) || DEFAULT_CONFIG.crossCooldownMinutes) * 60 * 1000;
 
   let idx = 0; const matches = [];
+  const startTime = Date.now(); let scannedCount = 0;
   async function processSymbol(sym) {
     const url = `${endpointBase}?symbol=${encodeURIComponent(sym)}&interval=${encodeURIComponent(interval)}&limit=${limit}`;
     const resp = await fetch(url, { cf: { cacheTtl: 0 } });
@@ -220,16 +221,23 @@ async function runScanOnce(env) {
       const batch = symbols.slice(idx, idx + concurrency);
       await Promise.all(batch.map(s => processSymbol(s)));
       idx += batch.length;
+      scannedCount += batch.length;
       if (idx < symbols.length) await new Promise(r => setTimeout(r, 150)); // 부하 완화
     }
     state.lastRun = Date.now(); state.lastError = null;
     // 최근 매칭을 누적 (최대 200개 유지)
     state.matches = Array.isArray(state.matches) ? [...matches, ...state.matches].slice(0, 200) : matches.slice(0, 200);
+    state.lastScanDuration = Date.now() - startTime;
+    state.scannedCount = scannedCount;
+    state.newMatches = matches.length;
     await saveState(env, state);
     await saveLastCross(env, lastMap);
     return { ok: true, count: matches.length };
   } catch (err) {
     state.lastRun = Date.now(); state.lastError = String(err);
+    state.lastScanDuration = Date.now() - startTime;
+    state.scannedCount = scannedCount;
+    state.newMatches = matches.length;
     await saveState(env, state);
     return { ok: false, error: 'scan_exception', detail: String(err) };
   }
@@ -261,6 +269,10 @@ async function handlePostSymbols(request, env) {
 }
 
 async function handleGetScanState(env) { const st = await loadState(env); return new Response(JSON.stringify({ ok: true, state: st }), { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders() } }); }
+async function handleScanNow(env) {
+  const res = await runScanOnce(env);
+  return new Response(JSON.stringify(res), { status: res.ok ? 200 : 500, headers: { 'Content-Type': 'application/json', ...corsHeaders() } });
+}
 
 const workerExport = {
   async fetch(request, env) {
@@ -297,7 +309,8 @@ const workerExport = {
     if (pathname === '/config' && request.method === 'POST') return handlePostConfig(request, env);
     if (pathname === '/symbols' && request.method === 'GET') return handleGetSymbols(env);
     if (pathname === '/symbols' && request.method === 'POST') return handlePostSymbols(request, env);
-    if (pathname === '/scan-state' && request.method === 'GET') return handleGetScanState(env);
+  if (pathname === '/scan-state' && request.method === 'GET') return handleGetScanState(env);
+  if (pathname === '/scan-now' && request.method === 'POST') return handleScanNow(env);
 
     return new Response('not found', { status: 404, headers: corsHeaders() });
   },
