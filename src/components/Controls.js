@@ -147,12 +147,12 @@ export default function Controls(props) {
         title="Set Cloudflare Worker URL for Telegram relay"
         onClick={() => {
           try {
-            const cur = (typeof localStorage !== 'undefined') ? (localStorage.getItem('serverUrl') || '') : '';
+            const cur = (typeof window !== 'undefined' && window.localStorage) ? (window.localStorage.getItem('serverUrl') || '') : '';
             const v = window.prompt('Set Worker URL (e.g. https://<name>.workers.dev)', cur);
             if (v == null) return;
             const trimmed = String(v).trim();
-            if (trimmed) localStorage.setItem('serverUrl', trimmed);
-            else localStorage.removeItem('serverUrl');
+            if (trimmed) window.localStorage.setItem('serverUrl', trimmed);
+            else window.localStorage.removeItem('serverUrl');
             window.location.reload();
           } catch (e) {}
         }}>
@@ -164,17 +164,28 @@ export default function Controls(props) {
         onClick={async () => {
           try {
             const serverUrl = (() => {
-              try { const s = localStorage.getItem('serverUrl') || ''; if (s) return s.replace(/\/$/, ''); } catch (e) {}
+              try {
+                const raw = (typeof window !== 'undefined' && window.localStorage) ? (window.localStorage.getItem('serverUrl') || '') : '';
+                if (raw) return String(raw).replace(/\/$/, '');
+              } catch (e) {}
+              // fallback to build-time env
+              const envVal = (process.env.REACT_APP_SERVER_URL && typeof process.env.REACT_APP_SERVER_URL === 'string') ? process.env.REACT_APP_SERVER_URL : '';
+              const envTrim = (envVal || '').trim();
+              if (envTrim) return envTrim.replace(/\/$/, '');
+              // fallback to same-origin
+              try { if (typeof window !== 'undefined' && window.location && window.location.origin) return window.location.origin.replace(/\/$/, ''); } catch (e) {}
               return '';
             })();
-            if (!serverUrl) { alert('No serverUrl set. Click Set Server URL first.'); return; }
+            try { console.log('[Controls] Test Telegram serverUrl', serverUrl); } catch (e) {}
+            if (!serverUrl) { (typeof window !== 'undefined' && window.alert) ? alert('No serverUrl set. Will try same-origin /send-alert.') : console.warn('No serverUrl set; trying same-origin'); }
+            try { console.log('[Controls] Test Telegram click', { serverUrl }); } catch (e) {}
             const sym = (symbol || '').toString().replace(/[^A-Za-z0-9]/g,'').toUpperCase() || 'TESTUSDT';
             const payload = { symbol: sym, message: `[TEST] manual send from UI`, emaShort: Number(monitorEma1)||26, emaLong: Number(monitorEma2)||200 };
-            const res = await fetch(`${serverUrl}/send-alert`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            const res = await fetch(`${serverUrl || ''}/send-alert`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
             const json = await res.json().catch(() => null);
-            alert(`send-alert ${res.ok ? 'OK' : 'FAIL'} (${res.status})\n${JSON.stringify(json)}`);
+            if (typeof window !== 'undefined' && window.alert) alert(`send-alert ${res.ok ? 'OK' : 'FAIL'} (${res.status})\n${JSON.stringify(json)}`);
           } catch (e) {
-            alert('send-alert error: ' + String(e));
+            if (typeof window !== 'undefined' && window.alert) alert('send-alert error: ' + String(e)); else console.error('send-alert error:', e);
           }
         }}>
         Test Telegram

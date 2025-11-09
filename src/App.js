@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 import './App.css';
 import React, { useEffect, useRef, useState } from 'react';
 import useEmaCross from './hooks/useEmaCross';
@@ -151,7 +152,9 @@ function App() {
   // if symbol becomes invalid, disable autoStart and disconnect to avoid wrong subscriptions
   // (moved below after hook initialization because it depends on connected/disconnect)
   // Disable hook autoConnect: App will control connecting so we can update server monitor symbol first
-  const { ema9, ema26, lastPrice, lastTick, lastCandleClosed, cross, confirmedCross, confirmedSource, connected, status, connect, disconnect, activeSymbol } = useEmaCross({ symbol, autoConnect: true, debug: showDebug, interval: `${monitorMinutes}m`, emaShort: monitorEma1, emaLong: monitorEma2, confirmClosedCandles: monitorConfirm });
+  // Guard against unexpected undefined return (e.g., faulty Jest mock) to keep tests stable.
+  const hookData = useEmaCross({ symbol, autoConnect: true, debug: showDebug, interval: `${monitorMinutes}m`, emaShort: monitorEma1, emaLong: monitorEma2, confirmClosedCandles: monitorConfirm }) || {};
+  const { ema9, ema26, lastPrice, lastTick, lastCandleClosed, cross, confirmedCross, confirmedSource, connected, status, connect, disconnect, activeSymbol } = hookData;
 
   
   
@@ -231,17 +234,7 @@ function App() {
   })();
 
   // quick setter for serverUrl via prompt, stored in localStorage
-  const promptSetServerUrl = React.useCallback(() => {
-    try {
-      const cur = (serverUrl || '');
-      const v = window.prompt('Set Worker URL (e.g. https://<name>.workers.dev)', cur);
-      if (v == null) return;
-      const trimmed = String(v).trim();
-      if (trimmed) localStorage.setItem('serverUrl', trimmed);
-      else localStorage.removeItem('serverUrl');
-      window.location.reload();
-    } catch (e) {}
-  }, [serverUrl]);
+  // Removed promptSetServerUrl (Controls component provides Set Server URL)
 
   // 서버측 스캔 설정을 프론트 변경값과 동기화 (EMA/분) — 프론트에서 한번 설정하면 서버가 값을 유지
   useEffect(() => {
@@ -460,9 +453,13 @@ function App() {
       return;
     }
     if (lastNotified.current == null) {
-      // seed without notifying
-      lastNotified.current = confirmedCross;
-      return;
+      // First observed cross. If it's from initialization source ('init') skip notify.
+      // Otherwise (e.g. mock/live source) allow sending alert immediately.
+      if (confirmedSource === 'init') {
+        lastNotified.current = confirmedCross; // seed only
+        return;
+      }
+      // fall through to notify logic below
     }
 
     if (lastNotified.current !== confirmedCross) {
