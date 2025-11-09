@@ -235,7 +235,7 @@ function App() {
         const payload = { interval: monitorMinutes, emaShort: monitorEma1, emaLong: monitorEma2, scanType: 'both' };
         await fetch(`${serverUrl}/config`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), signal: ctrl.signal });
       } catch (e) { /* no-op */ }
-    }, 300);
+    }, 200);
     return () => { try { ctrl.abort(); } catch (e) {} clearTimeout(t); };
   }, [serverUrl, monitorMinutes, monitorEma1, monitorEma2]);
 

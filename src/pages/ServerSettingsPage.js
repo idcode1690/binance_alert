@@ -183,32 +183,29 @@ export default function ServerSettingsPage() {
       </div>
 
       <div className="section">
-        <h3>설정 변경</h3>
+        <h3>설정 (읽기 전용 & Cooldown)</h3>
+        <p className="note">EMA / Interval 값은 Alerts 페이지에서 변경되며 자동으로 서버에 적용됩니다. 여기서는 중복 알림 Cooldown 만 조정 가능합니다.</p>
         <div className="form-row">
-          <label>Interval (예: 5m)</label>
-          <input value={form.interval} onChange={e => setForm(f => ({ ...f, interval: e.target.value }))} />
+          <label>Interval</label>
+          <input value={cfg ? cfg.interval : form.interval} readOnly />
         </div>
         <div className="form-row">
           <label>EMA Short</label>
-          <input type="number" value={form.emaShort} onChange={e => setForm(f => ({ ...f, emaShort: e.target.value }))} />
+          <input value={cfg ? cfg.emaShort : form.emaShort} readOnly />
         </div>
         <div className="form-row">
           <label>EMA Long</label>
-          <input type="number" value={form.emaLong} onChange={e => setForm(f => ({ ...f, emaLong: e.target.value }))} />
+          <input value={cfg ? cfg.emaLong : form.emaLong} readOnly />
         </div>
         <div className="form-row">
           <label>Scan Type</label>
-          <select value={form.scanType} onChange={e => setForm(f => ({ ...f, scanType: e.target.value }))}>
-            <option value="golden">golden</option>
-            <option value="dead">dead</option>
-            <option value="both">both</option>
-          </select>
+          <input value={cfg ? cfg.scanType : form.scanType} readOnly />
         </div>
         <div className="form-row">
           <label>Cooldown (minutes)</label>
           <input type="number" min={1} value={form.crossCooldownMinutes ?? 30} onChange={e => setForm(f => ({ ...f, crossCooldownMinutes: Number(e.target.value) }))} />
         </div>
-        <button className="primary" onClick={saveConfig}>저장 (Config)</button>
+        <button className="primary" onClick={saveConfig}>저장 (Cooldown만)</button>
       </div>
 
       <div className="section">

@@ -85,7 +85,7 @@ async function handleSendAlert(request, env) {
     });
     const result = await tgResp.json().catch(() => null);
     if (!tgResp.ok) {
-      return new Response(JSON.stringify({ ok: false, error: 'telegram_api_failed', detail: result }), {
+      return new Response(JSON.stringify({ ok: false, error: 'telegram_api_failed', status: tgResp.status, detail: result, hint: 'Check TELEGRAM_BOT_TOKEN/CHAT_ID and that the bot has access to the chat. Try /health.' }), {
         status: 502,
         headers: { 'Content-Type': 'application/json', ...corsHeaders() },
       });
@@ -95,7 +95,7 @@ async function handleSendAlert(request, env) {
       headers: { 'Content-Type': 'application/json', ...corsHeaders() },
     });
   } catch (err) {
-    return new Response(JSON.stringify({ ok: false, error: 'telegram_exception', detail: String(err) }), {
+    return new Response(JSON.stringify({ ok: false, error: 'telegram_exception', detail: String(err), hint: 'Network blocked or invalid token/chat id. Validate with Telegram test in UI.' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json', ...corsHeaders() },
     });
