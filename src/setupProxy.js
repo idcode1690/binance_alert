@@ -1,25 +1,3 @@
-const { createProxyMiddleware } = require('http-proxy-middleware');
-
-module.exports = function(app) {
-  const target = 'http://localhost:3001';
-
-  // Health and API endpoints
-  app.use(
-    ['/health', '/send-alert', '/set-symbol', '/send-test'],
-    createProxyMiddleware({ target, changeOrigin: true })
-  );
-
-  // Server-Sent Events stream
-  app.use(
-    '/events',
-    createProxyMiddleware({
-      target,
-      changeOrigin: true,
-      // ensure streaming isn't buffered
-      selfHandleResponse: false,
-      headers: {
-        Connection: 'keep-alive'
-      }
-    })
-  );
-};
+// Proxy removed: Node backend eliminated in simplified Cloudflare Pages Functions architecture.
+// This file is now a no-op to avoid CRA requiring deletion; safe to remove if desired.
+module.exports = function() {};

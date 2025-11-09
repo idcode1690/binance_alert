@@ -1,4 +1,17 @@
 require('dotenv').config();
+// Global safety nets to avoid crashing the process on unexpected errors in production
+process.on('unhandledRejection', (reason) => {
+  try {
+    const output = (reason && reason.stack) ? reason.stack : reason;
+    console.error('[unhandledRejection]', output);
+  } catch (e) {}
+});
+process.on('uncaughtException', (err) => {
+  try {
+    const output = (err && err.stack) ? err.stack : err;
+    console.error('[uncaughtException]', output);
+  } catch (e) {}
+});
 const axios = require('axios');
 const WebSocket = require('ws');
 const fs = require('fs');
@@ -24,6 +37,7 @@ const SYMBOL = process.env.SYMBOL || 'BTCUSDT';
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '';
 const PORT = process.env.PORT || 3001;
+console.log(`[startup] Node ${process.version} | env.NODE_ENV=${process.env.NODE_ENV} | PORT=${PORT}`);
 
 let lastPrice = null;
 let ws = null;
@@ -128,108 +142,6 @@ async function start() {
     connectWebSocket();
   } catch (err) {
     console.error('Startup error', err && err.message);
-    // If websockets fail, try reconnect later
-    setTimeout(() => {
+    // Deprecated Node server stub. All functionality migrated to Cloudflare Pages Functions.
+    console.log('Deprecated: server/index.js no longer used. Deploy with Cloudflare Pages Functions.');
       try { connectWebSocket(); } catch (e) { console.error('reconnect error', e && e.message); }
-    }, 5000);
-  }
-}
-
-// Express health endpoint
-const app = express();
-// permissive CORS for dev so the React app can call /health and /send-alert
-app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-  if (req.method === 'OPTIONS') {
-    res.status(204).end();
-    return;
-  }
-  next();
-});
-// allow JSON bodies for POST /send-alert
-app.use(express.json());
-app.get('/health', (req, res) => {
-  res.json({ ok: true, symbol: SYMBOL, lastPrice });
-});
-
-// test endpoint to trigger a Telegram test message (no auth) - useful in local dev
-// GET /send-test?message=hello
-app.get('/send-test', (req, res) => {
-  const msg = req.query.message || `${SYMBOL} - test alert from server`;
-  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
-    return res.status(400).json({ ok: false, error: 'Telegram not configured' });
-  }
-  sendTelegram(msg).then((result) => {
-    if (result && result.ok) return res.json({ ok: true, sent: msg });
-    return res.status(500).json({ ok: false, error: result && result.error });
-  }).catch((err) => {
-    return res.status(500).json({ ok: false, error: err && err.message });
-  });
-});
-
-// Server-Sent Events endpoint for frontend realtime subscriptions
-app.get('/events', (req, res) => {
-  // Required headers for SSE
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
-  // allow CORS from any origin (dev)
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.flushHeaders && res.flushHeaders();
-
-  // write a comment to keep connection alive
-  res.write(':connected\n\n');
-  sseClients.add(res);
-
-  req.on('close', () => {
-    try { sseClients.delete(res); } catch (e) {}
-  });
-});
-
-// Accept a client-triggered alert and forward to Telegram after server-side
-// verification against Binance REST klines (use last *closed* candle).
-app.post('/send-alert', express.json(), async (req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  const body = req.body || {};
-  const symbol = (body.symbol || SYMBOL).toString().replace(/[^A-Za-z0-9]/g, '').toUpperCase();
-  const price = typeof body.price !== 'undefined' ? Number(body.price) : lastPrice;
-  const emaShort = typeof body.emaShort !== 'undefined' ? Number(body.emaShort) : 9;
-  const emaLong = typeof body.emaLong !== 'undefined' ? Number(body.emaLong) : 26;
-  const interval = (body.interval || '1m').toString();
-  let message = body.message || (price ? `Alert EMA${emaShort}/${emaLong} @ ${price}` : `Alert EMA${emaShort}/${emaLong}`);
-  try { const tag = `EMA${emaShort}/${emaLong}`; if (message && !message.includes(tag)) message = `${message} (${tag})`; } catch (e) {}
-
-  // log receipt
-  try { fs.appendFileSync(`${__dirname}/alerts.log`, JSON.stringify({ ts: Date.now(), receipt: true, symbol, price, emaShort, emaLong, interval, message }) + '\n'); } catch (e) {}
-
-  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) return res.status(400).json({ ok: false, error: 'Telegram not configured' });
-
-  // Server will NOT re-calculate or verify EMA crosses. The frontend is authoritative
-  // for confirmed crosses. Accept the client's alert and forward to Telegram.
-  try {
-    const result = await sendTelegram(`${symbol} ${message}`);
-    if (result && result.ok) return res.json({ ok: true, sent: `${symbol} ${message}` });
-    return res.status(500).json({ ok: false, error: result && result.error });
-  } catch (e) {
-    return res.status(500).json({ ok: false, error: e && e.message });
-  }
-});
-
-// Serve React production build when available
-try {
-  const buildDir = path.join(__dirname, '..', 'build');
-  app.use(express.static(buildDir));
-  // fallback to index.html for client-side routing
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(buildDir, 'index.html'));
-  });
-} catch (e) {
-  // ignore if build directory is missing in dev
-}
-
-app.listen(PORT, () => {
-  console.log(`Server listening on port ${PORT}`);
-  start();
-});

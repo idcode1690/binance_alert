@@ -1,16 +1,1 @@
-name = "binance-alert-worker"
-main = "index.js"
-compatibility_date = "2025-11-09"
-
-# Set your account_id here before deploying or use wrangler CLI with --account-id
-# You can also omit this if you run `wrangler login` and publish from your machine.
-account_id = "your_account_id_here"
-
-# Worker bindings for secrets (set via dashboard or `wrangler secret put`)
-[vars]
-TELEGRAM_BOT_TOKEN = ""
-TELEGRAM_CHAT_ID = ""
-
-# Optional: route or workers.dev subdomain handled by Cloudflare
-# routes = [ { pattern = "example.com/send-alert", zone_id = "..." } ]
-# workers_dev = true
+## Deprecated: Worker removed. Use Cloudflare Pages Functions instead (./functions).

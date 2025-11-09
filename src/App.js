@@ -205,10 +205,7 @@ function App() {
     } catch (e) {}
   }, []);
   const lastNotified = useRef(null);
-  const [sseConnected, setSseConnected] = useState(false);
-  const [serverSymbol, setServerSymbol] = useState(null);
-  const [lastHealthyAt, setLastHealthyAt] = useState(null);
-  const [telegramConfigured, setTelegramConfigured] = useState(null); // null=unknown, true/false
+  // Removed SSE/server health state in Pages Functions mode
   const [view, setView] = useState('alerts');
   // serverUrl is provided at build-time via REACT_APP_SERVER_URL; when not set
   // the app should run in "client-only" mode (no SSE, no server Telegram relay).
@@ -267,59 +264,7 @@ function App() {
 
  
 
-  // Subscribe to server-sent events from server (realtime alerts emitted by server)
-  useEffect(() => {
-    // If no server URL is configured (static/client-only), skip creating SSE
-    if (!serverUrl) {
-      setSseConnected(false);
-      return undefined;
-    }
-    if (!window.EventSource) return undefined;
-    let es;
-    try {
-      es = new EventSource(`${serverUrl}/events`);
-      es.onopen = () => {
-        setSseConnected(true);
-        // fetch health once when SSE opens to sync server-side monitored symbol
-        try {
-          fetch(`${serverUrl}/health`).then((r) => r.json()).then((j) => { if (j && j.symbol) setServerSymbol((j.symbol || '').toString().toUpperCase()); }).catch(() => {});
-        } catch (e) {}
-      };
-      es.onmessage = (e) => {
-        try {
-          const obj = JSON.parse(e.data);
-          if (!obj) return;
-          // handle server alert events and telegram_sent confirmations
-          if (obj.type === 'alert') {
-            // prefer the activeSymbol from the hook, fallback to the selected symbol
-            const current = (activeSymbol || symbol || '').toString().replace(/[^A-Za-z0-9]/g, '').toUpperCase();
-            const incoming = (obj.symbol || '').toString().replace(/[^A-Za-z0-9]/g, '').toUpperCase();
-            // require incoming symbol to be present and match the currently-active symbol
-            if (!incoming || !current || incoming !== current) {
-              if (showDebug) console.debug('[App] dropping SSE alert for different symbol', { incoming, current, obj });
-              return;
-            }
-
-            const evObj = { ts: obj.ts || Date.now(), time: obj.when ? new Date(obj.when).toLocaleString() : new Date().toLocaleString(), type: obj.alert === 'bull' ? 'bull' : 'bear', price: obj.price, symbol: incoming, source: 'server' };
-            // use centralized dedupe/add helper
-            try { addEvent(evObj); } catch (e) { setEvents((prev) => [evObj, ...prev].slice(0, 500)); }
-          } else if (obj.type === 'telegram_sent') {
-            // server confirmed it sent a telegram; add a small event so UI reflects it
-            try {
-              const sym = (obj.symbol || '').toString().replace(/[^A-Za-z0-9]/g, '').toUpperCase() || (activeSymbol || symbol || '').toString().toUpperCase();
-              const ev = { ts: obj.ts || Date.now(), time: new Date(obj.ts || Date.now()).toLocaleString(), type: 'telegram', price: obj.price || lastPrice, symbol: sym, source: 'server-telegram', ok: obj.ok };
-              addEvent(ev);
-            } catch (e) {}
-          }
-        } catch (err) {}
-      };
-      es.onerror = () => {
-        setSseConnected(false);
-        try { es.close(); } catch (e) {}
-      };
-    } catch (e) {}
-    return () => { try { es && es.close(); } catch (e) {} };
-  }, [symbol, activeSymbol, showDebug, addEvent, lastPrice, serverUrl]);
+  // Removed SSE subscription: the app runs fully client-side with Pages Functions for Telegram relay.
 
   // helper to ask server to monitor a symbol, then connect the client
   const setServerAndConnect = React.useCallback(async (sym, opts) => {
@@ -331,28 +276,10 @@ function App() {
     }
   const emaShort = (opts && typeof opts.emaShort !== 'undefined') ? opts.emaShort : monitorEma1;
   const emaLong = (opts && typeof opts.emaLong !== 'undefined') ? opts.emaLong : monitorEma2;
-  const confirmCandles = (opts && typeof opts.confirmCandles !== 'undefined') ? opts.confirmCandles : monitorConfirm;
+  // confirmCandles retained previously for server sync; now unused after backend removal
     if (!q) {
       try { connect(sym); } catch (e) {}
       return;
-    }
-    try {
-      // update UI optimistically so the menu reflects the user's requested symbol
-      // even if the server is temporarily unreachable. Then notify the server.
-      setServerSymbol(q);
-      // call server endpoint to change monitored symbol and monitoring params
-      const paramsObj = { symbol: q, interval: String(interval), emaShort: String(emaShort), emaLong: String(emaLong) };
-      if (typeof confirmCandles !== 'undefined' && confirmCandles !== null) paramsObj.confirmCandles = String(confirmCandles);
-      const params = new URLSearchParams(paramsObj);
-      try {
-        await fetch(`${serverUrl}/set-symbol?${params.toString()}`, { method: 'GET' });
-      } catch (err) {
-        // server may be down; keep the optimistic UI state but inform user
-        try { showToast(`Server set-symbol failed: ${String(err)}`, false); } catch (e) {}
-        if (showDebug) console.debug('[App] /set-symbol request failed', err);
-      }
-    } catch (e) {
-      // ignore server errors and proceed to connect locally
     }
     try { connect(q); } catch (e) {}
     // persist the last-used monitor inputs so Alerts/Controls can restore them
@@ -360,7 +287,7 @@ function App() {
       const toStore = { monitorMinutes: (typeof interval === 'string' && interval.endsWith('m')) ? Number(interval.replace(/m$/, '')) : Number(interval), monitorEma1: Number(emaShort), monitorEma2: Number(emaLong), lastSymbol: q };
       localStorage.setItem('lastMonitor', JSON.stringify(toStore));
     } catch (e) {}
-  }, [connect, monitorMinutes, monitorEma1, monitorEma2, monitorConfirm, showDebug, showToast, serverUrl]);
+  }, [connect, monitorMinutes, monitorEma1, monitorEma2]);
 
   
 
@@ -380,41 +307,7 @@ function App() {
     }
   }, [symbol, symbolValid, autoStart, activeSymbol, connect, setServerAndConnect, status]);
 
-  // fetch server health on mount in case SSE isn't available yet
-  useEffect(() => {
-    if (!serverUrl) {
-      // no server configured (static mode)
-      setTelegramConfigured(false);
-      return;
-    }
-    try {
-      fetch(`${serverUrl}/health`).then((r) => r.json()).then((j) => { if (j && j.symbol) setServerSymbol((j.symbol || '').toString().toUpperCase()); if (j) { setLastHealthyAt(Date.now()); if (typeof j?.telegramConfigured !== 'undefined') setTelegramConfigured(!!j.telegramConfigured); } }).catch(() => {});
-    } catch (e) {}
-  }, [serverUrl]);
-
-  // poll /health periodically so UI can show last healthy time; keeps serverSymbol and telegramConfigured in sync
-  useEffect(() => {
-    if (!serverUrl) return undefined;
-    let mounted = true;
-    async function poll() {
-      try {
-        const r = await fetch(`${serverUrl}/health`);
-        if (!mounted) return;
-        const j = await r.json();
-        if (j && j.symbol) setServerSymbol((j.symbol || '').toString().toUpperCase());
-        if (j) {
-          setLastHealthyAt(Date.now());
-          if (typeof j?.telegramConfigured !== 'undefined') setTelegramConfigured(!!j.telegramConfigured);
-        }
-      } catch (e) {
-        // keep lastHealthyAt as-is on error
-      }
-    }
-    // initial poll
-    poll();
-    const id = setInterval(poll, 15000);
-    return () => { mounted = false; clearInterval(id); };
-  }, [serverUrl]);
+  // Removed server /health polling in simplified Pages-only mode
 
   // clearAlerts will be handled inline if needed; no export/import UI
 
@@ -650,7 +543,7 @@ function App() {
 
   return (
     <div className={`App ${darkMode ? 'dark' : ''}`}>
-  <TopMenu onNavigate={setView} view={view} darkMode={darkMode} toggleDark={toggleDark} serverSymbol={serverSymbol} sseConnected={sseConnected} lastHealthyAt={lastHealthyAt} telegramConfigured={telegramConfigured} />
+  <TopMenu onNavigate={setView} view={view} darkMode={darkMode} toggleDark={toggleDark} />
       <div className="container">
   <div className={`card ${view === 'alerts' ? 'view-alerts' : ''}`}>
               {view === 'scanner' ? (

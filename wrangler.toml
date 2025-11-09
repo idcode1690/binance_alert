@@ -1,0 +1,6 @@
+# Root Wrangler config for Cloudflare Pages Functions local dev
+# This removes compatibility date warnings.
+compatibility_date = "2025-08-16"
+
+# Optional future flags (uncomment if needed)
+# compatibility_flags = ["nodejs_compat"]

@@ -1,4 +1,4 @@
-name: Deploy Pages + Worker
+name: Deploy Cloudflare Pages (Functions only)
 
 on:
   push:
@@ -7,12 +7,6 @@ on:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    env:
-      # Inject secrets/job-level env so all steps can access them consistently.
-      REACT_APP_SERVER_URL: ${{ secrets.REACT_APP_SERVER_URL }}
-      CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
-      CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
-      CF_PAGES_PROJECT_NAME: ${{ secrets.CF_PAGES_PROJECT_NAME }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -24,18 +18,9 @@ jobs:
 
       - name: Validate required secrets
         run: |
-          # Fail early if any required secret is missing. Do not print secret values.
-          missing=()
-          [ -z "$CF_API_TOKEN" ] && missing+=(CF_API_TOKEN)
-          [ -z "$CF_ACCOUNT_ID" ] && missing+=(CF_ACCOUNT_ID)
-          [ -z "$CF_PAGES_PROJECT_NAME" ] && missing+=(CF_PAGES_PROJECT_NAME)
-          if [ ${#missing[@]} -ne 0 ]; then
-            echo "Error: Missing required repository secrets: ${missing[*]}"
-            echo "Set them using: gh secret set <NAME> --body <value>"
-            exit 1
-          fi
-          if [ -z "$REACT_APP_SERVER_URL" ]; then
-            echo "Info: REACT_APP_SERVER_URL not set. Frontend will default to same-origin behavior."
+          if [ -z "${{ secrets.CF_API_TOKEN }}" ] || [ -z "${{ secrets.CF_ACCOUNT_ID }}" ] || [ -z "${{ secrets.CF_PAGES_PROJECT_NAME }}" ]; then
+            echo "Error: Missing Cloudflare Pages secrets (CF_API_TOKEN / CF_ACCOUNT_ID / CF_PAGES_PROJECT_NAME).";
+            exit 1;
           fi
         shell: bash
 
@@ -43,7 +28,6 @@ jobs:
         run: npm ci
 
       - name: Build React app
-        # REACT_APP_SERVER_URL is provided at the job-level from secrets so the build embeds the correct worker URL
         run: npm run build
 
       - name: Publish to Cloudflare Pages
@@ -54,13 +38,5 @@ jobs:
           projectName: ${{ secrets.CF_PAGES_PROJECT_NAME }}
           directory: './build'
 
-      - name: Publish Worker (Telegram relay)
-        # pin wrangler-action to a specific stable patch release to avoid resolver warnings
-        uses: cloudflare/wrangler-action@v3.14.1
-        with:
-          apiToken: ${{ secrets.CF_API_TOKEN }}
-          workingDirectory: './worker'
-        env:
-          # make account id available to wrangler if the worker uses it
-          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+      # Worker deployment removed (using Pages Functions). If needed later, re-add Wrangler step.
 
