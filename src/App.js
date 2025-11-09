@@ -8,6 +8,7 @@ import DebugPanel from './components/DebugPanel';
 import Notes from './components/Notes';
 import Header from './components/Header';
 import TopMenu from './components/TopMenu';
+import ServerSettingsPage from './pages/ServerSettingsPage';
 import ScannerPage from './pages/ScannerPage';
 // 클라이언트 측 스캐너는 서버(Cloudflare Worker) cron 기반으로 대체되므로 임시 비활성화
 // import scannerManager from './lib/scannerManager';
@@ -561,7 +562,9 @@ function App() {
   <TopMenu onNavigate={setView} view={view} darkMode={darkMode} toggleDark={toggleDark} />
       <div className="container">
   <div className={`card ${view === 'alerts' ? 'view-alerts' : ''}`}>
-              {view === 'scanner' ? (
+              {view === 'server' ? (
+                <ServerSettingsPage />
+              ) : view === 'scanner' ? (
             <ScannerPage availableSymbols={availableSymbols} fetchExchangeInfo={fetchExchangeInfo} monitorMinutes={monitorMinutes} setMonitorMinutes={setMonitorMinutes} monitorEma1={monitorEma1} setMonitorEma1={setMonitorEma1} monitorEma2={monitorEma2} setMonitorEma2={setMonitorEma2} />
           ) : (
             <>
