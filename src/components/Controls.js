@@ -21,8 +21,8 @@ export default function Controls(props) {
     setMonitorEma1,
     monitorEma2,
     setMonitorEma2,
-    monitorConfirm,
-    setMonitorConfirm,
+  monitorConfirm, // kept for internal logic (not displayed)
+  setMonitorConfirm,
   } = props;
 
   const symbolValidateTimer = useRef(null);
@@ -35,13 +35,14 @@ export default function Controls(props) {
   const [minsStr, setMinsStr] = useState(String(monitorMinutes ?? ''));
   const [ema1Str, setEma1Str] = useState(String(monitorEma1 ?? ''));
   const [ema2Str, setEma2Str] = useState(String(monitorEma2 ?? ''));
-  const [confirmStr, setConfirmStr] = useState(String(monitorConfirm ?? ''));
+  // Confirm 입력 UI 제거: 부모 상태는 다른 컴포넌트/알림 로직에서만 사용됨.
+  void monitorConfirm;
 
   // keep local strings in sync if parent updates (e.g., persisted restore)
   useEffect(() => { setMinsStr(String(monitorMinutes ?? '')); }, [monitorMinutes]);
   useEffect(() => { setEma1Str(String(monitorEma1 ?? '')); }, [monitorEma1]);
   useEffect(() => { setEma2Str(String(monitorEma2 ?? '')); }, [monitorEma2]);
-  useEffect(() => { setConfirmStr(String(monitorConfirm ?? '')); }, [monitorConfirm]);
+  // Confirm 값 변화에 따른 로컬 UI 처리 제거됨
 
   return (
     <div className="controls">
@@ -113,14 +114,7 @@ export default function Controls(props) {
         }} />
       </label>
 
-      <label className="control-inline-label">
-        <span className="label-text">Confirm</span>
-        <input type="number" min="1" value={confirmStr} onChange={(e) => { setConfirmStr(e.target.value); }} onBlur={() => {
-          const p = parseInt(confirmStr, 10);
-          if (!Number.isFinite(p) || p <= 0) return;
-          setMonitorConfirm(p);
-        }} />
-      </label>
+  {/* Confirm 입력폼 제거됨 (monitorConfirm은 내부 로직만 유지) */}
 
       <button disabled={!(symbolValid === true) || status === 'reloading'} title={!(symbolValid === true) ? '유효한 심볼을 입력하세요' : (status === 'reloading' ? '초기화 중...' : 'Start')} onClick={async () => {
         const ok = await validateSymbolOnce(symbol);
@@ -143,53 +137,7 @@ export default function Controls(props) {
 
       <button className="secondary" onClick={() => disconnect()}>Stop</button>
 
-      <button className="secondary" style={{marginLeft:8}}
-        title="Set Cloudflare Worker URL for Telegram relay"
-        onClick={() => {
-          try {
-            const cur = (typeof window !== 'undefined' && window.localStorage) ? (window.localStorage.getItem('serverUrl') || '') : '';
-            const v = window.prompt('Set Worker URL (e.g. https://<name>.workers.dev)', cur);
-            if (v == null) return;
-            const trimmed = String(v).trim();
-            if (trimmed) window.localStorage.setItem('serverUrl', trimmed);
-            else window.localStorage.removeItem('serverUrl');
-            window.location.reload();
-          } catch (e) {}
-        }}>
-        Set Server URL
-      </button>
-
-      <button className="secondary" style={{marginLeft:8}}
-        title="Send a test Telegram message via /send-alert"
-        onClick={async () => {
-          try {
-            const serverUrl = (() => {
-              try {
-                const raw = (typeof window !== 'undefined' && window.localStorage) ? (window.localStorage.getItem('serverUrl') || '') : '';
-                if (raw) return String(raw).replace(/\/$/, '');
-              } catch (e) {}
-              // fallback to build-time env
-              const envVal = (process.env.REACT_APP_SERVER_URL && typeof process.env.REACT_APP_SERVER_URL === 'string') ? process.env.REACT_APP_SERVER_URL : '';
-              const envTrim = (envVal || '').trim();
-              if (envTrim) return envTrim.replace(/\/$/, '');
-              // fallback to same-origin
-              try { if (typeof window !== 'undefined' && window.location && window.location.origin) return window.location.origin.replace(/\/$/, ''); } catch (e) {}
-              return '';
-            })();
-            try { console.log('[Controls] Test Telegram serverUrl', serverUrl); } catch (e) {}
-            if (!serverUrl) { (typeof window !== 'undefined' && window.alert) ? alert('No serverUrl set. Will try same-origin /send-alert.') : console.warn('No serverUrl set; trying same-origin'); }
-            try { console.log('[Controls] Test Telegram click', { serverUrl }); } catch (e) {}
-            const sym = (symbol || '').toString().replace(/[^A-Za-z0-9]/g,'').toUpperCase() || 'TESTUSDT';
-            const payload = { symbol: sym, message: `[TEST] manual send from UI`, emaShort: Number(monitorEma1)||26, emaLong: Number(monitorEma2)||200 };
-            const res = await fetch(`${serverUrl || ''}/send-alert`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-            const json = await res.json().catch(() => null);
-            if (typeof window !== 'undefined' && window.alert) alert(`send-alert ${res.ok ? 'OK' : 'FAIL'} (${res.status})\n${JSON.stringify(json)}`);
-          } catch (e) {
-            if (typeof window !== 'undefined' && window.alert) alert('send-alert error: ' + String(e)); else console.error('send-alert error:', e);
-          }
-        }}>
-        Test Telegram
-      </button>
+      {/* Set Server URL 및 Test Telegram 버튼 제거 요청에 따라 UI에서 숨김 */}
 
       {/* removed Auto-start and Debug checkboxes as requested */}
 
