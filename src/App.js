@@ -9,7 +9,8 @@ import Notes from './components/Notes';
 import Header from './components/Header';
 import TopMenu from './components/TopMenu';
 import ScannerPage from './pages/ScannerPage';
-import scannerManager from './lib/scannerManager';
+// 클라이언트 측 스캐너는 서버(Cloudflare Worker) cron 기반으로 대체되므로 임시 비활성화
+// import scannerManager from './lib/scannerManager';
 
 function beep() {
   try {
@@ -190,11 +191,12 @@ function App() {
   // Inform scannerManager about available symbols.
   // IMPORTANT: do NOT forward raw scanner "results" into the global Alerts/events list here.
   // Scanner results are shown on the separate Scanner page and should not be mixed with Alerts.
-  useEffect(() => {
-    try {
-      scannerManager.setGetSymbols(() => availableSymbols || []);
-    } catch (e) {}
-  }, [availableSymbols]);
+  // 서버측 Cron 스캐닝 사용: 클라이언트 스캐너 비활성화
+  // useEffect(() => {
+  //   try {
+  //     scannerManager.setGetSymbols(() => availableSymbols || []);
+  //   } catch (e) {}
+  // }, [availableSymbols]);
   const showToast = React.useCallback((message, ok = true) => {
     try {
       setToast({ message, ok, ts: Date.now() });
@@ -222,6 +224,19 @@ function App() {
     } catch (e) {}
     return null;
   })();
+
+  // 서버측 스캔 설정을 프론트 변경값과 동기화 (EMA/분) — 프론트에서 한번 설정하면 서버가 값을 유지
+  useEffect(() => {
+    if (!serverUrl) return;
+    const ctrl = new AbortController();
+    const t = setTimeout(async () => {
+      try {
+        const payload = { interval: monitorMinutes, emaShort: monitorEma1, emaLong: monitorEma2, scanType: 'both' };
+        await fetch(`${serverUrl}/config`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), signal: ctrl.signal });
+      } catch (e) { /* no-op */ }
+    }, 300);
+    return () => { try { ctrl.abort(); } catch (e) {} clearTimeout(t); };
+  }, [serverUrl, monitorMinutes, monitorEma1, monitorEma2]);
 
   // Debug helper: simulate a confirmed cross from the frontend (calls /send-alert and adds local event)
   const simulateConfirmedCross = React.useCallback((forceType) => {

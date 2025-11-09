@@ -1,44 +1,14 @@
-name: Deploy Cloudflare Pages (Functions only)
+name: (Disabled) Deploy Cloudflare Pages
 
 on:
-  push:
-    branches: ["master"]
+  # 완전 비활성화: 수동 실행만 허용하고, 잡은 no-op 처리
+  workflow_dispatch:
 
 jobs:
-  build-and-deploy:
+  noop:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Use Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-
-      - name: Validate required secrets
+      - name: Disabled notice
         run: |
-          if [ -z "${{ secrets.CF_API_TOKEN }}" ] || [ -z "${{ secrets.CF_ACCOUNT_ID }}" ] || [ -z "${{ secrets.CF_PAGES_PROJECT_NAME }}" ]; then
-            echo "Error: Missing Cloudflare Pages secrets (CF_API_TOKEN / CF_ACCOUNT_ID / CF_PAGES_PROJECT_NAME).";
-            exit 1;
-          fi
-        shell: bash
-
-      - name: Install dependencies (npm install due to lock mismatch)
-        run: npm install
-
-      - name: Build React app
-        run: npm run build
-        env:
-          REACT_APP_SERVER_URL: ${{ secrets.REACT_APP_SERVER_URL }}
-
-      - name: Publish to Cloudflare Pages
-        uses: cloudflare/pages-action@v1
-        with:
-          apiToken: ${{ secrets.CF_API_TOKEN }}
-          accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          projectName: ${{ secrets.CF_PAGES_PROJECT_NAME }}
-          directory: './build'
-
-      # Worker deployment removed (using Pages Functions). If needed later, re-add Wrangler step.
+          echo "This workflow is disabled. We use GitHub Pages for frontend and Cloudflare Worker for backend."
 
