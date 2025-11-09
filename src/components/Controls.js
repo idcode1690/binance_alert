@@ -21,6 +21,8 @@ export default function Controls(props) {
     setMonitorEma1,
     monitorEma2,
     setMonitorEma2,
+    monitorConfirm,
+    setMonitorConfirm,
   } = props;
 
   const symbolValidateTimer = useRef(null);
@@ -33,11 +35,13 @@ export default function Controls(props) {
   const [minsStr, setMinsStr] = useState(String(monitorMinutes ?? ''));
   const [ema1Str, setEma1Str] = useState(String(monitorEma1 ?? ''));
   const [ema2Str, setEma2Str] = useState(String(monitorEma2 ?? ''));
+  const [confirmStr, setConfirmStr] = useState(String(monitorConfirm ?? ''));
 
   // keep local strings in sync if parent updates (e.g., persisted restore)
   useEffect(() => { setMinsStr(String(monitorMinutes ?? '')); }, [monitorMinutes]);
   useEffect(() => { setEma1Str(String(monitorEma1 ?? '')); }, [monitorEma1]);
   useEffect(() => { setEma2Str(String(monitorEma2 ?? '')); }, [monitorEma2]);
+  useEffect(() => { setConfirmStr(String(monitorConfirm ?? '')); }, [monitorConfirm]);
 
   return (
     <div className="controls">
@@ -109,6 +113,15 @@ export default function Controls(props) {
         }} />
       </label>
 
+      <label className="control-inline-label">
+        <span className="label-text">Confirm</span>
+        <input type="number" min="1" value={confirmStr} onChange={(e) => { setConfirmStr(e.target.value); }} onBlur={() => {
+          const p = parseInt(confirmStr, 10);
+          if (!Number.isFinite(p) || p <= 0) return;
+          setMonitorConfirm(p);
+        }} />
+      </label>
+
       <button disabled={!(symbolValid === true) || status === 'reloading'} title={!(symbolValid === true) ? '유효한 심볼을 입력하세요' : (status === 'reloading' ? '초기화 중...' : 'Start')} onClick={async () => {
         const ok = await validateSymbolOnce(symbol);
         if (!ok) { setSymbolValid(false); return; }
@@ -129,6 +142,43 @@ export default function Controls(props) {
       }}>Start</button>
 
       <button className="secondary" onClick={() => disconnect()}>Stop</button>
+
+      <button className="secondary" style={{marginLeft:8}}
+        title="Set Cloudflare Worker URL for Telegram relay"
+        onClick={() => {
+          try {
+            const cur = (typeof localStorage !== 'undefined') ? (localStorage.getItem('serverUrl') || '') : '';
+            const v = window.prompt('Set Worker URL (e.g. https://<name>.workers.dev)', cur);
+            if (v == null) return;
+            const trimmed = String(v).trim();
+            if (trimmed) localStorage.setItem('serverUrl', trimmed);
+            else localStorage.removeItem('serverUrl');
+            window.location.reload();
+          } catch (e) {}
+        }}>
+        Set Server URL
+      </button>
+
+      <button className="secondary" style={{marginLeft:8}}
+        title="Send a test Telegram message via /send-alert"
+        onClick={async () => {
+          try {
+            const serverUrl = (() => {
+              try { const s = localStorage.getItem('serverUrl') || ''; if (s) return s.replace(/\/$/, ''); } catch (e) {}
+              return '';
+            })();
+            if (!serverUrl) { alert('No serverUrl set. Click Set Server URL first.'); return; }
+            const sym = (symbol || '').toString().replace(/[^A-Za-z0-9]/g,'').toUpperCase() || 'TESTUSDT';
+            const payload = { symbol: sym, message: `[TEST] manual send from UI`, emaShort: Number(monitorEma1)||26, emaLong: Number(monitorEma2)||200 };
+            const res = await fetch(`${serverUrl}/send-alert`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            const json = await res.json().catch(() => null);
+            alert(`send-alert ${res.ok ? 'OK' : 'FAIL'} (${res.status})\n${JSON.stringify(json)}`);
+          } catch (e) {
+            alert('send-alert error: ' + String(e));
+          }
+        }}>
+        Test Telegram
+      </button>
 
       {/* removed Auto-start and Debug checkboxes as requested */}
 
@@ -155,5 +205,6 @@ Controls.propTypes = {
   setMonitorEma1: PropTypes.func.isRequired,
   monitorEma2: PropTypes.number.isRequired,
   setMonitorEma2: PropTypes.func.isRequired,
-  // monitorConfirm/setMonitorConfirm intentionally omitted so Confirm uses app default when not exposed in UI
+  monitorConfirm: PropTypes.number.isRequired,
+  setMonitorConfirm: PropTypes.func.isRequired,
 };

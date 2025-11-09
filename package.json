@@ -20,7 +20,10 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "pages:dev": "npx wrangler pages dev ./build",
+    "test:telegram": "node scripts/test_telegram.js",
+    "health": "node -e \"(async()=>{const u=(process.env.WORKER_URL||'https://binance-alert.idcode1690.workers.dev').replace(/\\\\\\/$/,'');const r=await fetch(u+'/health');console.log(await r.text())})()\"",
+    "pages:dev": "wrangler pages dev ./build",
+    "pages:deploy": "wrangler pages deploy ./build",
     "worker:deploy": "wrangler deploy -c wrangler.worker.toml",
     "worker:dev": "wrangler dev -c wrangler.worker.toml",
     "eject": "react-scripts eject"

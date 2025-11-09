@@ -80,7 +80,7 @@ function App() {
     } catch (e) {}
     return 200;
   });
-  const [monitorConfirm] = useState(() => {
+  const [monitorConfirm, setMonitorConfirm] = useState(() => {
     try {
       const raw = localStorage.getItem('lastMonitor');
       if (raw) {
@@ -209,21 +209,39 @@ function App() {
   const lastNotified = useRef(null);
   // Removed SSE/server health state in Pages Functions mode
   const [view, setView] = useState('alerts');
-  // serverUrl is provided at build-time via REACT_APP_SERVER_URL; when not set
-  // the app should run in "client-only" mode (no SSE, no server Telegram relay).
-  // Trim the env var to avoid accidental trailing-space issues embedding a bad URL
-  const _rawServerUrl = (process.env.REACT_APP_SERVER_URL && typeof process.env.REACT_APP_SERVER_URL === 'string') ? process.env.REACT_APP_SERVER_URL : '';
-  // Default to same-origin when env var isn't provided so a single Render service works out of the box
+  // Resolve serverUrl in this priority:
+  // 1) localStorage 'serverUrl' (allows runtime override without rebuild)
+  // 2) REACT_APP_SERVER_URL (build-time)
+  // 3) same-origin (only works when Pages/Worker share origin)
   const serverUrl = (() => {
-    const trimmed = (_rawServerUrl || '').trim();
-    if (trimmed.length > 0) return trimmed;
+    try {
+      const ls = (typeof window !== 'undefined') ? (localStorage.getItem('serverUrl') || '') : '';
+      const lsTrim = (ls || '').trim();
+      if (lsTrim) return lsTrim.replace(/\/$/, '');
+    } catch (e) {}
+    const envVal = (process.env.REACT_APP_SERVER_URL && typeof process.env.REACT_APP_SERVER_URL === 'string') ? process.env.REACT_APP_SERVER_URL : '';
+    const envTrim = (envVal || '').trim();
+    if (envTrim) return envTrim.replace(/\/$/, '');
     try {
       if (typeof window !== 'undefined' && window.location && window.location.origin) {
-        return window.location.origin;
+        return window.location.origin.replace(/\/$/, '');
       }
     } catch (e) {}
     return null;
   })();
+
+  // quick setter for serverUrl via prompt, stored in localStorage
+  const promptSetServerUrl = React.useCallback(() => {
+    try {
+      const cur = (serverUrl || '');
+      const v = window.prompt('Set Worker URL (e.g. https://<name>.workers.dev)', cur);
+      if (v == null) return;
+      const trimmed = String(v).trim();
+      if (trimmed) localStorage.setItem('serverUrl', trimmed);
+      else localStorage.removeItem('serverUrl');
+      window.location.reload();
+    } catch (e) {}
+  }, [serverUrl]);
 
   // 서버측 스캔 설정을 프론트 변경값과 동기화 (EMA/분) — 프론트에서 한번 설정하면 서버가 값을 유지
   useEffect(() => {
@@ -232,7 +250,10 @@ function App() {
     const t = setTimeout(async () => {
       try {
         const payload = { interval: monitorMinutes, emaShort: monitorEma1, emaLong: monitorEma2, scanType: 'both' };
-        await fetch(`${serverUrl}/config`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), signal: ctrl.signal });
+        const res = await fetch(`${serverUrl}/config`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), signal: ctrl.signal });
+        if (!res.ok) {
+          console.warn('[App] /config sync failed', res.status);
+        }
       } catch (e) { /* no-op */ }
     }, 200);
     return () => { try { ctrl.abort(); } catch (e) {} clearTimeout(t); };
@@ -473,6 +494,8 @@ function App() {
           if (showDebug) console.debug('[App] confirmedCross skipped POST /send-alert because serverUrl is not set');
           return;
         }
+        // preflight debug
+        try { if (showDebug) console.debug('[App] confirmedCross preparing /send-alert', { serverUrl, payloadPreview: { symbol: symToShow, price: priceToUse } }); } catch (e) {}
   const payload = { symbol: symToShow, price: priceToUse, message: type + ' @ ' + priceToUse, emaShort: monitorEma1, emaLong: monitorEma2 };
         // debug: log state used for send-alert so we can trace mismatched alerts
         try {
@@ -520,6 +543,9 @@ function App() {
         new Notification(type, { body });
       }
 
+      // Add a lightweight console trace of the cross event for operational debugging
+  try { console.log('[App] confirmedCross event', { symbol: symToShow, direction: confirmedCross, price: priceToUse, serverUrl, confirmClosedCandles: monitorConfirm }); } catch (e) {}
+
       // beep and log
       beep();
       const evObj = { ts: Date.now(), time: new Date().toLocaleString(), type: confirmedCross, price: lastPrice, symbol: symToShow, source: confirmedSource || 'unknown' };
@@ -527,7 +553,7 @@ function App() {
       setEvents((s) => [evObj, ...s].slice(0, 500));
       lastNotified.current = confirmedCross;
     }
-  }, [confirmedCross, lastPrice, lastTick, symbol, activeSymbol, confirmedSource, showDebug, addEvent, showToast, ema9, ema26, serverUrl, monitorEma1, monitorEma2]);
+  }, [confirmedCross, lastPrice, lastTick, symbol, activeSymbol, confirmedSource, showDebug, addEvent, showToast, ema9, ema26, serverUrl, monitorEma1, monitorEma2, monitorConfirm]);
 
   // 심볼이 바뀔 때 이전 심볼의 알림 상태가 남아 있어 잘못된 알림이 뜨는 문제 방지
   // 심볼을 변경하면 lastNotified를 초기화해서 다음 confirmedCross는 초기 시드로 처리되도록 한다.
@@ -595,6 +621,8 @@ function App() {
                 setMonitorEma1={setMonitorEma1}
                 monitorEma2={monitorEma2}
                 setMonitorEma2={setMonitorEma2}
+                monitorConfirm={monitorConfirm}
+                setMonitorConfirm={setMonitorConfirm}
                 
               />
               {/* 간단한 로딩 표시: 심볼 변경으로 상태가 reloading일 때 보임 */}

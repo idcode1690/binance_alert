@@ -35,7 +35,64 @@ npm run build      # production build (static assets in ./build)
 	 - `TELEGRAM_BOT_TOKEN`
 	 - `TELEGRAM_CHAT_ID`
 5. Pages Functions auto-detected (directory `functions/`).
-6. After deploy, use: `https://<your-pages-domain>/health` to verify.
+6. After deploy, test: `https://<your-pages-domain>/health` → `{ ok: true, telegramConfigured: true }`.
+7. (Optional) Separate Cloudflare Worker deployment for cron/KV scanning: `wrangler deploy -c wrangler.worker.toml` (ensure KV IDs & secrets set via dashboard or `wrangler secret put`).
+
+### CI (GitHub Actions) Cloudflare Pages 자동 배포
+GitHub 저장소에 Cloudflare Pages 배포를 자동화하려면 아래 워크플로우 예시를 참고하여 `.github/workflows/cloudflare-pages.yml` 파일을 추가하세요:
+
+```yaml
+name: Deploy Cloudflare Pages
+on:
+	push:
+		branches: [ master ]
+	workflow_dispatch:
+
+jobs:
+	deploy:
+		runs-on: ubuntu-latest
+		steps:
+			- uses: actions/checkout@v4
+			- uses: actions/setup-node@v4
+				with:
+					node-version: '18'
+					cache: 'npm'
+			- name: Install deps
+				run: npm ci
+			- name: Build
+				run: npm run build
+				env:
+					REACT_APP_SERVER_URL: https://<your-pages-domain>
+			- name: Publish to Cloudflare Pages
+				uses: cloudflare/pages-action@v1
+				with:
+					apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+					accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+					projectName: binance-alert
+					directory: build
+					gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+				env:
+					TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+					TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+```
+
+필수 GitHub Secrets:
+- `CLOUDFLARE_API_TOKEN`: Pages 프로젝트에 대한 write 권한이 있는 토큰
+- `CLOUDFLARE_ACCOUNT_ID`: Cloudflare 계정 ID
+- `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`: Functions에서 사용될 텔레그램 시크릿
+
+> Pages 대시보드에 환경변수(Secrets)를 설정한 경우, action에서 env로 넘기지 않아도 됩니다. 한곳(대시보드 또는 workflow)에서만 관리하는 것을 권장합니다.
+
+### Worker vs Pages
+| Use Case | Pages Functions | Standalone Worker |
+|----------|-----------------|-------------------|
+| Static front-end hosting | ✅ | ❌ (must embed assets) |
+| Simple REST endpoints (/health,/send-alert) | ✅ | ✅ |
+| KV Cron Scanner (scheduled EMA cross) | ❌ (Pages has no cron) | ✅ (via `triggers.crons`) |
+| Lowest complexity | ✅ | — |
+| Needs background scanning without client open | ✅ (if moved to Worker) | ✅ |
+
+If you need scheduled scans, deploy the Worker (separate from Pages). Frontend can still call Worker domain for /send-alert.
 
 ### Cloudflare 설정 (한국어 안내)
 1) GitHub 연결: Cloudflare 대시보드 → Pages → Create project → GitHub 저장소 선택
@@ -46,7 +103,8 @@ npm run build      # production build (static assets in ./build)
 4) Secrets 등록 (Pages → Settings → Environment Variables):
 	- `TELEGRAM_BOT_TOKEN`: 봇 토큰
 	- `TELEGRAM_CHAT_ID`: 채팅 ID
-5) 배포 확인: `https://<프로젝트도메인>/health` 응답이 `{ ok: true, ... }` 인지 확인
+5) 배포 확인: `https://<프로젝트도메인>/health` 응답이 `{ ok: true, telegramConfigured: true }` 인지 확인
+6) (선택) 워커 배포: `wrangler deploy -c wrangler.worker.toml` (CI에서는 `npm run worker:deploy`).
 
 로컬 개발(선택):
 ```powershell
@@ -95,7 +153,7 @@ Cloudflare Pages 를 Functions 용으로만 쓰고, 정적 사이트는 GitHub P
 1. Cloudflare Pages 프로젝트 생성 (빌드 명령/디렉터리 동일: `npm run build`, `build`).
 2. Secrets 설정: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
 3. 첫 배포 후 Functions 도메인 확인: 예) `https://<project>.pages.dev`.
-4. GitHub Pages 쪽 `.env` (또는 Actions 환경변수) 에 `REACT_APP_SERVER_URL=https://<project>.pages.dev` 추가 후 다시 빌드/배포.
+4. GitHub Pages 쪽 `.env` (또는 Actions 환경변수) 에 `REACT_APP_SERVER_URL=https://<project>.pages.dev` 추가 후 다시 빌드/배포. 또는 브라우저 콘솔에서 `localStorage.setItem('serverUrl','https://<project>.pages.dev')` 후 새로고침.
 5. 브라우저 콘솔에서 `POST https://<project>.pages.dev/send-alert` 호출/응답 OK 확인.
 
 설정을 하지 않으면 앱 내부에서 `serverUrl` 이 null 로 판단되어 Telegram 관련 호출을 자동으로 건너뛰고 토스트에 "Telegram disabled" 가 표시됩니다.
@@ -118,12 +176,12 @@ Cloudflare Pages 를 Functions 용으로만 쓰고, 정적 사이트는 GitHub P
 ## 트러블슈팅 (Troubleshooting)
 | 문제 | 해결 |
 |------|------|
-| Telegram 전송 실패 | Cloudflare Pages 환경변수(Secrets) `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` 설정 여부 확인. HTTPS로 `/send-alert` 호출. |
+| Telegram 전송 실패 | Secrets 설정 여부, `serverUrl` 지정(localStorage 또는 REACT_APP_SERVER_URL), /send-alert 응답 코드/JSON detail 확인 |
 | price 값이 null | Binance API 응답 지연/레이트리밋 가능. 잠시 후 재시도. 브라우저 네트워크/CORS 차단 여부 확인. |
 | 빌드 산출물이 비어있음 | Pages 설정 Output directory가 `build` 로 되어있는지 확인. `npm run build` 성공 로그 확인. |
-| functions 동작 안 함 (404) | 루트에 `functions/` 디렉터리 존재 여부 확인. 파일명은 `health.js`, `price.js`, `send-alert.js` 형태. |
+| functions 404 | `functions/` 디렉터리 구조, 파일명 확인(`health.js`, `price.js`, `send-alert.js`). Pages 배포 로그에서 Functions 활성화 여부. |
 | 로컬 `/health` 호출 실패 | `npm run build` 후 `npx wrangler pages dev ./build` 로 실행했는지 확인. 포트 충돌 시 다른 포트 지정. |
-| Telegram 메시지 포맷 이상 | `POST /send-alert` JSON body 필드(`symbol`, `message`, `price`, `emaShort`, `emaLong`) 확인. 누락되면 기본 문자열로 조합됨. |
+| Telegram 메시지 포맷 이상 | `POST /send-alert` JSON body 필드 확인(`symbol`, `message`, `price`, `emaShort`, `emaLong`). Worker 로직에서 조합되는 `EMA<short>/<long>` 태그 정상 여부. |
 
 ## 라이선스 (License)
 MIT (별도 명시 없을 시). 필요하면 Attribution 추가 조정 가능.

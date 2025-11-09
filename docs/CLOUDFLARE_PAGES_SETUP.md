@@ -59,17 +59,18 @@ curl -s -X POST \
 
 ---
 ## 5. GitHub Actions 연동 (자동 배포)
-이미 리포지토리에 `.github/workflows/deploy.yml` 존재:
-- master 브랜치에 push → Cloudflare Pages로 자동 배포
+리포지토리에 `.github/workflows/cloudflare-pages.yml` 가 포함되어 있습니다:
+- master 브랜치에 push → Cloudflare Pages로 자동 배포 (또는 수동 실행 가능)
 - 필요한 GitHub Secrets (리포지토리 Settings → Secrets → Actions):
-  - `CF_API_TOKEN` : Pages 프로젝트 배포 권한 포함 토큰
-  - `CF_ACCOUNT_ID` : Cloudflare 계정 ID
+  - `CLOUDFLARE_API_TOKEN` : Pages 프로젝트 배포 권한 포함 토큰
+  - `CLOUDFLARE_ACCOUNT_ID` : Cloudflare 계정 ID
   - `CF_PAGES_PROJECT_NAME` : Pages 프로젝트 이름
+  - (선택) `REACT_APP_SERVER_URL`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`
 
 토큰 생성:
 1. Cloudflare Dashboard → My Profile → API Tokens → Create Token
 2. 템플릿에서 Pages 권한 선택 (또는 "Edit Cloudflare Pages" 커스텀 권한)
-3. 발급 토큰을 GitHub Secret `CF_API_TOKEN` 으로 추가
+3. 발급 토큰을 GitHub Secret `CLOUDFLARE_API_TOKEN` 으로 추가
 
 ---
 ## 6. 로컬 개발 (Functions 포함)
