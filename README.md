@@ -103,3 +103,6 @@ You can deploy the static build to GitHub Pages (workflow already exists) but Te
 ## 라이선스 (License)
 MIT (별도 명시 없을 시). 필요하면 Attribution 추가 조정 가능.
 
+## Cloudflare Pages 설치 문서
+상세 단계별 안내: `docs/CLOUDFLARE_PAGES_SETUP.md` 파일 참조 (프로젝트 생성, Secrets 등록, 로컬 dev, 문제 해결, 보안 모범 사례 포함).
+
