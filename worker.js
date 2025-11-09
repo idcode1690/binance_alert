@@ -103,7 +103,7 @@ async function handleSendAlert(request, env) {
 }
 
 // ====== Server-side scanner config/state via KV ======
-const DEFAULT_CONFIG = { interval: '5m', emaShort: 26, emaLong: 200, scanType: 'golden' }; // scanType: 'golden' | 'dead' | 'both'
+const DEFAULT_CONFIG = { interval: '5m', emaShort: 26, emaLong: 200, scanType: 'golden', crossCooldownMinutes: 30 }; // scanType: 'golden' | 'dead' | 'both'
 const DEFAULT_SYMBOLS = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT'];
 
 async function kvGetJson(kv, key, fallback = null) {
@@ -122,6 +122,7 @@ async function loadConfig(env) {
   cfg.emaShort = parseInt(cfg.emaShort, 10) || DEFAULT_CONFIG.emaShort;
   cfg.emaLong = parseInt(cfg.emaLong, 10) || DEFAULT_CONFIG.emaLong;
   if (!['golden', 'dead', 'both'].includes(cfg.scanType)) cfg.scanType = DEFAULT_CONFIG.scanType;
+  cfg.crossCooldownMinutes = Math.max(1, parseInt(cfg.crossCooldownMinutes, 10) || DEFAULT_CONFIG.crossCooldownMinutes);
   return cfg;
 }
 async function saveConfig(env, cfg) { return kvPutJson(env.KV_SCAN, 'config', cfg); }
@@ -185,6 +186,7 @@ async function runScanOnce(env) {
   const emaLong = parseInt(cfg.emaLong, 10);
   const needed = Math.max(emaShort, emaLong) + 10; const limit = Math.min(1000, Math.max(needed + 10, 120));
   const concurrency = 8; // 보수적으로 시작
+  const cooldownMs = Math.max(1, parseInt(cfg.crossCooldownMinutes, 10) || DEFAULT_CONFIG.crossCooldownMinutes) * 60 * 1000;
 
   let idx = 0; const matches = [];
   async function processSymbol(sym) {
@@ -204,8 +206,8 @@ async function runScanOnce(env) {
       if (crossed(t, prevShort, prevLong, lastShort, lastLong)) {
         const key = `${sym}:${t}`;
         const lastTs = lastMap[key] || 0;
-        // 1 캔들 내 반복 방지: 최근 30분 내에 동일 신호 전송했다면 스킵 (주기/전략에 맞게 조절 가능)
-        if (now - lastTs < 30 * 60 * 1000) continue;
+  // 최근 중복 방지: 설정된 crossCooldownMinutes 내 재발송 제한
+  if (now - lastTs < cooldownMs) continue;
         const msg = (t === 'golden' ? '[골든]' : '[데드]') + ` ${sym} ${interval} EMA${emaShort}/${emaLong} @ ${new Date().toLocaleString('ko-KR')}`;
         const sent = await sendTelegram(env, msg);
         if (sent && sent.ok) { lastMap[key] = now; }
@@ -241,6 +243,9 @@ async function handlePostConfig(request, env) {
   if (typeof body.emaShort !== 'undefined') next.emaShort = parseInt(body.emaShort, 10) || DEFAULT_CONFIG.emaShort;
   if (typeof body.emaLong !== 'undefined') next.emaLong = parseInt(body.emaLong, 10) || DEFAULT_CONFIG.emaLong;
   if (typeof body.scanType !== 'undefined') { const t = String(body.scanType); next.scanType = ['golden','dead','both'].includes(t) ? t : next.scanType; }
+  if (typeof body.crossCooldownMinutes !== 'undefined') {
+    next.crossCooldownMinutes = Math.max(1, parseInt(body.crossCooldownMinutes, 10) || DEFAULT_CONFIG.crossCooldownMinutes);
+  }
   await saveConfig(env, next);
   return new Response(JSON.stringify({ ok: true, config: next }), { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders() } });
 }

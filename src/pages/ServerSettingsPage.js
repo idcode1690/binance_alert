@@ -16,9 +16,10 @@ export default function ServerSettingsPage() {
   const [cfg, setCfg] = useState(null);
   const [symbols, setSymbols] = useState([]);
   const [state, setState] = useState(null);
-  const [form, setForm] = useState({ interval: '5m', emaShort: 26, emaLong: 200, scanType: 'both' });
+  const [form, setForm] = useState({ interval: '5m', emaShort: 26, emaLong: 200, scanType: 'both', crossCooldownMinutes: 30 });
   const [symbolsInput, setSymbolsInput] = useState('');
   const [message, setMessage] = useState(null);
+  const [health, setHealth] = useState(null);
 
   const showMsg = useCallback((msg, ok = true) => {
     setMessage({ msg, ok, ts: Date.now() });
@@ -29,20 +30,23 @@ export default function ServerSettingsPage() {
     if (!serverUrl) return;
     setLoading(true);
     try {
-      const [cRes, sRes, stRes] = await Promise.all([
+      const [cRes, sRes, stRes, hRes] = await Promise.all([
         fetch(`${serverUrl}/config`),
         fetch(`${serverUrl}/symbols`),
-        fetch(`${serverUrl}/scan-state`)
+        fetch(`${serverUrl}/scan-state`),
+        fetch(`${serverUrl}/health`)
       ]);
       const cJson = await cRes.json().catch(() => null);
       const sJson = await sRes.json().catch(() => null);
       const stJson = await stRes.json().catch(() => null);
+      const hJson = await hRes.json().catch(() => null);
       if (cJson && cJson.ok && cJson.config) {
         setCfg(cJson.config);
         setForm(cJson.config);
       }
       if (sJson && sJson.ok && Array.isArray(sJson.symbols)) setSymbols(sJson.symbols);
       if (stJson && stJson.ok && stJson.state) setState(stJson.state);
+      if (hJson && (hJson.ok || typeof hJson.telegramConfigured !== 'undefined')) setHealth(hJson);
     } catch (e) {
       showMsg('설정 조회 실패: ' + String(e), false);
     } finally {
@@ -82,6 +86,40 @@ export default function ServerSettingsPage() {
     } catch (e) { showMsg('심볼 오류: ' + String(e), false); }
   };
 
+  const saveSymbolsArray = async (arr) => {
+    if (!serverUrl) return;
+    try {
+      const res = await fetch(`${serverUrl}/symbols`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(arr) });
+      const j = await res.json().catch(() => null);
+      if (res.ok && j && j.ok) {
+        setSymbols(j.symbols);
+        showMsg('심볼 저장 완료');
+      } else showMsg('심볼 저장 실패', false);
+    } catch (e) { showMsg('심볼 오류: ' + String(e), false); }
+  };
+
+  const removeSymbol = async (sym) => {
+    try {
+      const next = (symbols || []).filter(s => s !== sym);
+      setSymbols(next);
+      await saveSymbolsArray(next);
+    } catch (e) { showMsg('삭제 실패: ' + String(e), false); }
+  };
+
+  const runScanNow = async () => {
+    if (!serverUrl) return;
+    try {
+      const res = await fetch(`${serverUrl}/scan-now`, { method: 'POST' });
+      const j = await res.json().catch(() => null);
+      if (res.ok && j) {
+        showMsg(`수동 스캔 완료 (count=${j.count ?? 0})`);
+        await refreshState();
+      } else {
+        showMsg('수동 스캔 실패', false);
+      }
+    } catch (e) { showMsg('수동 스캔 오류: ' + String(e), false); }
+  };
+
   const refreshState = async () => {
     if (!serverUrl) return;
     try {
@@ -110,6 +148,13 @@ export default function ServerSettingsPage() {
             <div>emaShort: <strong>{cfg.emaShort}</strong></div>
             <div>emaLong: <strong>{cfg.emaLong}</strong></div>
             <div>scanType: <strong>{cfg.scanType}</strong></div>
+            <div>cooldown(min): <strong>{cfg.crossCooldownMinutes ?? 30}</strong></div>
+          </div>
+        )}
+        {health && (
+          <div className="health">
+            <div>telegramConfigured: <strong>{String(health.telegramConfigured)}</strong></div>
+            <div>server time: {health.time ? new Date(health.time).toLocaleString() : '—'}</div>
           </div>
         )}
       </div>
@@ -136,21 +181,36 @@ export default function ServerSettingsPage() {
             <option value="both">both</option>
           </select>
         </div>
+        <div className="form-row">
+          <label>Cooldown (minutes)</label>
+          <input type="number" min="1" value={form.crossCooldownMinutes ?? 30} onChange={e => setForm(f => ({ ...f, crossCooldownMinutes: Number(e.target.value) }))} />
+        </div>
         <button className="primary" onClick={saveConfig}>저장 (Config)</button>
       </div>
 
       <div className="section">
         <h3>심볼 목록</h3>
         <div className="symbols-box">
-          {symbols && symbols.length ? symbols.map(s => <span key={s} className="sym-chip">{s}</span>) : <em>없음</em>}
+          {symbols && symbols.length ? symbols.map(s => (
+            <span key={s} className="sym-chip">
+              {s}
+              <button className="chip-x" aria-label={`remove ${s}`} onClick={() => removeSymbol(s)}>×</button>
+            </span>
+          )) : <em>없음</em>}
         </div>
         <textarea value={symbolsInput} onChange={e => setSymbolsInput(e.target.value)} placeholder="BTCUSDT ETHUSDT ..." rows={3} />
-        <button onClick={saveSymbols}>심볼 저장</button>
+        <div style={{display:'flex', gap:8}}>
+          <button onClick={saveSymbols}>심볼 저장 (입력값)</button>
+          <button onClick={() => saveSymbolsArray(symbols)}>현재 심볼 저장</button>
+        </div>
       </div>
 
       <div className="section">
         <h3>스캔 상태</h3>
-        <button onClick={refreshState}>새로고침</button>
+        <div style={{display:'flex', gap:8}}>
+          <button onClick={refreshState}>새로고침</button>
+          <button onClick={runScanNow}>수동 스캔 실행</button>
+        </div>
         {state && (
           <div className="state-info">
             <div>lastRun: {state.lastRun ? new Date(state.lastRun).toLocaleString() : '—'}</div>
