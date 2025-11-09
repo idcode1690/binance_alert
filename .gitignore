@@ -11,6 +11,26 @@
 # production
 /build
 
+# cloudflare/wrangler local cache & temp bundles
+.wrangler/
+
+# local artifacts & temp generated files
+bundle.js
+temp_*
+client_bg.log
+server_bg.log
+server_run.log
+server_run_debug.log
+klines.json
+index_html.txt
+alerts.log
+
+# legacy removed directories (ensure not re-added)
+/server
+/worker
+render.yaml
+README_DEPLOY.md
+
 # misc
 .DS_Store
 .env.local
