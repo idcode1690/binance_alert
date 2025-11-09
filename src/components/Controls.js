@@ -22,7 +22,7 @@ export default function Controls(props) {
     monitorEma2,
     setMonitorEma2,
   monitorConfirm, // kept for internal logic (not displayed)
-  setMonitorConfirm,
+  // setMonitorConfirm removed from UI and not used
   } = props;
 
   const symbolValidateTimer = useRef(null);
