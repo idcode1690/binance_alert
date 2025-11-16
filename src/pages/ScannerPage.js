@@ -232,7 +232,7 @@ export default function ScannerPage({ availableSymbols, fetchExchangeInfo, monit
   }
 
   return (
-  <div className="alerts">
+  <div className="alerts scanner-root">
       {/* modal removed: only play beep when a new match is detected */}
       <div className="alerts-title">Binance EMA Cross Scanner</div>
   <div className="panel scanner-panel">

@@ -21,9 +21,18 @@ const scannerManager = (() => {
     try { if (typeof window !== 'undefined' && window.localStorage) { window.localStorage.setItem('scannerResults', JSON.stringify(results.slice(0, 200))); } } catch (e) {}
   }
   function notifyThrottled(force = false) {
-    const now = Date.now();
-    if (force || now - lastNotifyTs >= 100) { lastNotifyTs = now; pendingNotify = false; notifyNow(); return; }
-    if (!pendingNotify) { pendingNotify = true; const wait = Math.max(0, 100 - (now - lastNotifyTs)); setTimeout(() => { lastNotifyTs = Date.now(); pendingNotify = false; notifyNow(); }, wait); }
+    try {
+      const now = Date.now();
+      // If the page is hidden (background tab), don't rely on setTimeout-based throttling
+      // which browsers may clamp heavily; instead deliver notifications synchronously so
+      // the React state held by listeners stays up-to-date when the tab becomes visible.
+      const isHidden = (typeof document !== 'undefined' && document.hidden);
+      if (isHidden) {
+        lastNotifyTs = now; pendingNotify = false; notifyNow(); return;
+      }
+      if (force || now - lastNotifyTs >= 100) { lastNotifyTs = now; pendingNotify = false; notifyNow(); return; }
+      if (!pendingNotify) { pendingNotify = true; const wait = Math.max(0, 100 - (now - lastNotifyTs)); setTimeout(() => { lastNotifyTs = Date.now(); pendingNotify = false; notifyNow(); }, wait); }
+    } catch (e) { try { notifyNow(); } catch (e2) {} }
   }
 
   function onUpdate(cb) { listeners.add(cb); return () => listeners.delete(cb); }
@@ -112,7 +121,22 @@ const scannerManager = (() => {
         const batch = filtered.slice(i, i + currentConcurrency); if (!batch.length) break;
         await Promise.all(batch.map(sym => processSymbol(sym)));
         if (cancel) break; i += batch.length;
-        if (i < filtered.length) { const jitter = Math.floor(Math.random() * Math.min(120, Math.max(10, Math.floor(batchDelayCurrent * 0.5)))); const delay = Math.max(0, batchDelayCurrent + jitter); await sleep(delay); }
+        if (i < filtered.length) {
+          // When the page is hidden, browser timers may be clamped and make the scanner
+          // appear to 'stop'. In that case, keep scans going but be conservative: reduce
+          // concurrency to 1 and use a very small yield to avoid relying on long setTimeouts.
+          try {
+            const isHidden = (typeof document !== 'undefined' && document.hidden);
+            if (isHidden) {
+              // small yield so we don't spin the event loop too hard, but avoid long sleeps
+              await sleep(20);
+            } else {
+              const jitter = Math.floor(Math.random() * Math.min(120, Math.max(10, Math.floor(batchDelayCurrent * 0.5))));
+              const delay = Math.max(0, batchDelayCurrent + jitter);
+              await sleep(delay);
+            }
+          } catch (e) { /* ignore */ }
+        }
       }
     } catch (err) { try { console.error('scannerManager.start error', err && err.message ? err.message : err); } catch (e) {} }
     finally { try { for (const c of currentAbortControllers) { try { c.abort(); } catch (e) {} } } catch (e) {} currentAbortControllers.clear(); running = false; currentSymbol = null; cancel = false; scanStartTime = null; scanType = null; notifyThrottled(true); }

@@ -192,6 +192,19 @@ button.secondary {
   margin-top: 14px;
 }
 
+/* Scanner page uses the same .alerts block at the very top of the card,
+   so remove the extra top margin there to balance top/bottom whitespace
+   and match the Alerts view visual rhythm. */
+.scanner-root.alerts {
+  margin-top: 0;
+}
+
+/* Make the scanner panel vertical padding match the Alerts controls feel */
+.scanner-panel {
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
 .alerts ul {
   list-style: none;
   padding-left: 0;
@@ -667,3 +680,64 @@ button.secondary {
 .no-results { color: var(--muted); }
 
 .alert-source { font-size: 0.7rem; color: var(--muted); margin-top: 4px; }
+
+/* Mobile-friendly adjustments for Scanner and Alerts */
+@media (max-width: 600px) {
+  .container { padding: 10px 12px 18px 12px; }
+  .card { padding: 12px; }
+
+  /* Stack scanner inputs and controls vertically for narrow screens */
+  .scanner-panel {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    padding: 6px;
+  }
+
+  .scanner-controls-left {
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
+    align-items: center;
+    justify-content: flex-start;
+    overflow-x: auto;
+  }
+
+  /* Make numeric inputs easier to tap on mobile */
+  .scanner-controls-left input[type="number"],
+  .scanner-panel input[type="number"] {
+    min-width: 56px;
+    max-width: 84px;
+    padding: 8px 10px;
+    font-size: 14px;
+  }
+
+  /* Buttons become full-width or expand evenly on small screens */
+  .scanner-controls {
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
+    width: 100%;
+    justify-content: space-between;
+  }
+  .scanner-controls .scanner-btn {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 0.95rem;
+    padding: 10px 8px;
+  }
+
+  /* Progress and status text slightly larger and wrap-friendly */
+  .scanner-progress-container { font-size: 0.85rem; }
+
+  /* Alerts list: reduce left column, allow wrapping and smaller right column */
+  .alert-item { padding: 8px 6px; }
+  .alert-left { min-width: 80px; max-width: 120px; }
+  .alert-right { flex: 0 0 90px; }
+
+  /* Reduce visual padding inside generic panels */
+  .panel { padding: 8px; }
+
+  /* Ensure toast is reachable on small screens */
+  .toast { right: 8px; left: 8px; top: 12px; }
+}
