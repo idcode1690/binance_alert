@@ -11,6 +11,7 @@ const scannerManager = (() => {
   let currentAbortControllers = new Set();
   let listeners = new Set();
   let getSymbolsFn = null;
+  let workerInstance = null;
   // throttle notifications to reduce render overhead
   let lastNotifyTs = 0; let pendingNotify = false;
 
@@ -63,6 +64,35 @@ const scannerManager = (() => {
     const filtered = (Array.isArray(list) ? list.filter(s => typeof s === 'string' && /USDT$/i.test(s)) : []);
     progress.total = filtered.length; notifyThrottled(true);
     const endpointBase = 'https://fapi.binance.com/fapi/v1/klines';
+
+    // Try to delegate scanning to dedicated worker (served at /worker-scanner.js)
+    const symbolsArray = Array.isArray(list) ? list : [];
+    if (typeof Worker !== 'undefined' && typeof window !== 'undefined') {
+      try {
+        workerInstance = new Worker('/worker-scanner.js');
+        workerInstance.onmessage = (ev) => {
+          const m = ev.data || {};
+          if (m.type === 'started') {
+            progress.total = m.total || progress.total; notifyThrottled(true);
+          } else if (m.type === 'progress') {
+            progress.done = m.done || progress.done; currentSymbol = m.currentSymbol || currentSymbol; notifyThrottled();
+          } else if (m.type === 'match' && m.ev) {
+            results.unshift(m.ev); if (results.length > 500) results = results.slice(0, 500); notifyThrottled();
+          } else if (m.type === 'done') {
+            progress.done = m.done || progress.done; running = false; currentSymbol = null; cancel = false; scanStartTime = null; notifyThrottled(true);
+            try { workerInstance.terminate(); } catch (e) {} workerInstance = null;
+          } else if (m.type === 'stopped') {
+            try { workerInstance.terminate(); } catch (e) {} workerInstance = null; running = false; currentSymbol = null; cancel = false; scanStartTime = null; notifyThrottled(true);
+          }
+        };
+        // send start command with symbols and options
+        workerInstance.postMessage({ cmd: 'start', symbols: symbolsArray, opts, scanType: type });
+        return; // worker will handle the rest
+      } catch (e) {
+        try { if (workerInstance) { workerInstance.terminate(); workerInstance = null; } } catch (e2) {}
+        // fallthrough to inline scanner
+      }
+    }
 
     const concurrencyDefault = (opts && typeof opts.concurrency === 'number') ? Math.max(1, opts.concurrency) : 8;
     const batchDelayBase = (opts && typeof opts.batchDelay === 'number') ? Math.max(0, opts.batchDelay) : 120;
@@ -142,7 +172,19 @@ const scannerManager = (() => {
     finally { try { for (const c of currentAbortControllers) { try { c.abort(); } catch (e) {} } } catch (e) {} currentAbortControllers.clear(); running = false; currentSymbol = null; cancel = false; scanStartTime = null; scanType = null; notifyThrottled(true); }
   }
 
-  function stop() { cancel = true; try { for (const c of currentAbortControllers) { try { c.abort(); } catch (e) {} } currentAbortControllers.clear(); } catch (e) {} running = false; currentSymbol = null; scanStartTime = null; scanType = null; notifyThrottled(true); }
+  function stop() {
+    cancel = true;
+    try { for (const c of currentAbortControllers) { try { c.abort(); } catch (e) {} } currentAbortControllers.clear(); } catch (e) {}
+    // If a worker is running, tell it to stop and terminate it
+    try {
+      if (workerInstance) {
+        try { workerInstance.postMessage({ cmd: 'stop' }); } catch (e) {}
+        try { workerInstance.terminate(); } catch (e) {}
+        workerInstance = null;
+      }
+    } catch (e) {}
+    running = false; currentSymbol = null; scanStartTime = null; scanType = null; notifyThrottled(true);
+  }
   function getState() { return stateSnapshot(); }
   function removeResult(id) { if (!id) return; results = results.filter(r => r.id !== id); notifyThrottled(); }
   function clearResults() { results = []; notifyThrottled(true); }
