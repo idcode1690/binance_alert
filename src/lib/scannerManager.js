@@ -135,7 +135,8 @@ const scannerManager = (() => {
         }
         if (matched) {
           const lastVolume = (Array.isArray(data) && data[lastIdx] && data[lastIdx][5] != null) ? parseFloat(data[lastIdx][5]) : 0;
-          const ev = { id: `${sym}-${Date.now()}-${Math.random().toString(36).slice(2,8)}`, symbol: sym, lastShort, lastLong, time: new Date().toLocaleString(), interval, emaShort, emaLong, type: scanType, volume: lastVolume };
+          // include previous EMA values for easier debugging of why a match was detected
+          const ev = { id: `${sym}-${Date.now()}-${Math.random().toString(36).slice(2,8)}`, symbol: sym, prevShort, prevLong, lastShort, lastLong, time: new Date().toLocaleString(), interval, emaShort, emaLong, type: scanType, volume: lastVolume };
           results.unshift(ev); if (results.length > 500) results = results.slice(0, 500);
           notifyThrottled();
         }

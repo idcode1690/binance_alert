@@ -90,7 +90,7 @@ self.onmessage = async (ev) => {
         if (scanType === 'golden') matched = (match.prevShort <= match.prevLong && match.lastShort > match.lastLong);
         else if (scanType === 'dead') matched = (match.prevShort >= match.prevLong && match.lastShort < match.lastLong);
         if (matched) {
-          const ev = { id: `${match.sym}-${Date.now()}-${Math.random().toString(36).slice(2,8)}`, symbol: match.sym, lastShort: match.lastShort, lastLong: match.lastLong, time: new Date().toLocaleString(), interval, emaShort, emaLong, type: scanType, volume: lastVolume };
+          const ev = { id: `${match.sym}-${Date.now()}-${Math.random().toString(36).slice(2,8)}`, symbol: match.sym, prevShort: match.prevShort, prevLong: match.prevLong, lastShort: match.lastShort, lastLong: match.lastLong, time: new Date().toLocaleString(), interval, emaShort, emaLong, type: scanType, volume: lastVolume };
           try { self.postMessage({ type: 'match', ev }); } catch (e) {}
         }
       }

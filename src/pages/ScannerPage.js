@@ -100,6 +100,14 @@ export default function ScannerPage({ availableSymbols, fetchExchangeInfo, monit
       const mins = parseInt(minsStr, 10);
       const ema1 = parseInt(ema1Str, 10);
       const ema2 = parseInt(ema2Str, 10);
+      // validate EMA ordering (short < long)
+      if (Number.isFinite(ema1) && Number.isFinite(ema2) && ema1 >= ema2) {
+        // user likely swapped fields; prevent a confusing scan
+        // use a simple alert so user notices immediately
+        try { window.alert('Invalid EMA values: EMA1 must be smaller than EMA2'); } catch (e) {}
+        setUiScanType(null);
+        return;
+      }
       const opts = {
         interval: Number.isFinite(mins) && mins > 0 ? mins : monitorMinutes,
         emaShort: Number.isFinite(ema1) && ema1 > 0 ? ema1 : monitorEma1,
@@ -122,6 +130,12 @@ export default function ScannerPage({ availableSymbols, fetchExchangeInfo, monit
       const mins = parseInt(minsStr, 10);
       const ema1 = parseInt(ema1Str, 10);
       const ema2 = parseInt(ema2Str, 10);
+      // validate EMA ordering (short < long)
+      if (Number.isFinite(ema1) && Number.isFinite(ema2) && ema1 >= ema2) {
+        try { window.alert('Invalid EMA values: EMA1 must be smaller than EMA2'); } catch (e) {}
+        setUiScanType(null);
+        return;
+      }
       const opts = {
         interval: Number.isFinite(mins) && mins > 0 ? mins : monitorMinutes,
         emaShort: Number.isFinite(ema1) && ema1 > 0 ? ema1 : monitorEma1,
