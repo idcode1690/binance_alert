@@ -38,11 +38,12 @@ async function processBatch(batch, endpointBase, interval, candleLimit, emaShort
     if (!r || !r.ok || !Array.isArray(r.data)) continue;
     const closes = r.data.map(d => parseFloat(d[4]));
     const neededCandles = Math.max(emaShort, emaLong) + 10;
-    if (!Array.isArray(closes) || closes.length < neededCandles) continue;
-    const emaShortArr = calculateEma(closes, emaShort); const emaLongArr = calculateEma(closes, emaLong);
-    const lastIdx = closes.length - 1; const prevIdx = lastIdx - 1;
-    const prevShort = emaShortArr[prevIdx]; const prevLong = emaLongArr[prevIdx];
-    const lastShort = emaShortArr[lastIdx]; const lastLong = emaLongArr[lastIdx];
+      // require one extra candle so we can use the last *closed* candle (not the in-progress one)
+      if (!Array.isArray(closes) || closes.length < neededCandles + 1) continue;
+      const emaShortArr = calculateEma(closes, emaShort); const emaLongArr = calculateEma(closes, emaLong);
+      const lastClosedIdx = closes.length - 2; const prevIdx = lastClosedIdx - 1;
+      const prevShort = emaShortArr[prevIdx]; const prevLong = emaLongArr[prevIdx];
+      const lastShort = emaShortArr[lastClosedIdx]; const lastLong = emaLongArr[lastClosedIdx];
     if (typeof prevShort === 'number' && typeof prevLong === 'number' && typeof lastShort === 'number' && typeof lastLong === 'number') {
       // Determine crossover direction was delegated from main thread via message
       matches.push({ sym: r.sym, prevShort, prevLong, lastShort, lastLong, lastCandle: r.data[lastIdx] });

@@ -213,11 +213,12 @@ async function runScanOnce(env, overrides = {}) {
     if (!resp.ok) return;
     const data = await resp.json();
     const closes = Array.isArray(data) ? data.map(d => parseFloat(d[4])) : [];
-    if (!closes.length || closes.length < needed) return;
+    // require one extra candle so we use the last closed candle (not the in-progress live candle)
+    if (!closes.length || closes.length < needed + 1) return;
     const emaS = calculateEma(closes, emaShort); const emaL = calculateEma(closes, emaLong);
-    const lastIdx = closes.length - 1; const prevIdx = lastIdx - 1;
+    const lastClosedIdx = closes.length - 2; const prevIdx = lastClosedIdx - 1;
     const prevShort = emaS[prevIdx]; const prevLong = emaL[prevIdx];
-    const lastShort = emaS[lastIdx]; const lastLong = emaL[lastIdx];
+    const lastShort = emaS[lastClosedIdx]; const lastLong = emaL[lastClosedIdx];
     const now = Date.now();
     const typesToCheck = cfg.scanType === 'both' ? ['golden','dead'] : [cfg.scanType];
     for (const t of typesToCheck) {

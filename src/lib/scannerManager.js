@@ -152,11 +152,12 @@ const scannerManager = (() => {
         backoffCount = Math.max(0, backoffCount - 1); consecutiveSuccesses += 1;
         if (consecutiveSuccesses >= successThreshold) { consecutiveSuccesses = 0; if (concurrencyCurrent < maxConcurrency) concurrencyCurrent += 1; batchDelayCurrent = Math.max(minBatchDelay, Math.floor(batchDelayCurrent * 0.85)); }
         const closes = Array.isArray(data) ? data.map(d => parseFloat(d[4])) : [];
-        if (!Array.isArray(closes) || closes.length < neededCandles) return;
+          // require one extra candle so we can use the last closed candle (avoid counting the live/open candle)
+          if (!Array.isArray(closes) || closes.length < neededCandles + 1) return;
         const emaShortArr = calculateEma(closes, emaShort); const emaLongArr = calculateEma(closes, emaLong);
-        const lastIdx = closes.length - 1; const prevIdx = lastIdx - 1;
-        const prevShort = emaShortArr[prevIdx]; const prevLong = emaLongArr[prevIdx];
-        const lastShort = emaShortArr[lastIdx]; const lastLong = emaLongArr[lastIdx];
+          const lastClosedIdx = closes.length - 2; const prevIdx = lastClosedIdx - 1;
+          const prevShort = emaShortArr[prevIdx]; const prevLong = emaLongArr[prevIdx];
+          const lastShort = emaShortArr[lastClosedIdx]; const lastLong = emaLongArr[lastClosedIdx];
         let matched = false;
         if (typeof prevShort === 'number' && typeof prevLong === 'number' && typeof lastShort === 'number' && typeof lastLong === 'number') {
           if (scanType === 'golden') matched = (prevShort <= prevLong && lastShort > lastLong);
