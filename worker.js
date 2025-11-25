@@ -175,8 +175,24 @@ async function sendTelegram(env, text) {
   return r.ok ? { ok: true, result: j } : { ok: false, error: 'telegram_api_failed', detail: j };
 }
 
-async function runScanOnce(env) {
-  const cfg = await loadConfig(env);
+async function runScanOnce(env, overrides = {}) {
+  // Load stored config and merge overrides (overrides come from client form / API)
+  const storedCfg = await loadConfig(env);
+  const cfg = { ...storedCfg, ...(overrides || {}) };
+  // Normalize interval override if provided (allow numeric minutes)
+  if (typeof overrides.interval !== 'undefined') {
+    let v = overrides.interval;
+    if (typeof v === 'number' || /^\d+$/.test(String(v))) v = `${v}m`;
+    cfg.interval = String(v);
+  }
+  // Ensure EMA values are integers
+  if (typeof overrides.emaShort !== 'undefined') cfg.emaShort = parseInt(overrides.emaShort, 10) || cfg.emaShort;
+  if (typeof overrides.emaLong !== 'undefined') cfg.emaLong = parseInt(overrides.emaLong, 10) || cfg.emaLong;
+  if (typeof overrides.scanType !== 'undefined') {
+    const t = String(overrides.scanType);
+    cfg.scanType = ['golden', 'dead', 'both'].includes(t) ? t : cfg.scanType;
+  }
+
   const symbols = await loadSymbols(env);
   const state = await loadState(env);
   const lastMap = await loadLastCross(env);
@@ -184,8 +200,9 @@ async function runScanOnce(env) {
   const interval = cfg.interval;
   const emaShort = parseInt(cfg.emaShort, 10);
   const emaLong = parseInt(cfg.emaLong, 10);
-  const needed = Math.max(emaShort, emaLong) + 10; const limit = Math.min(1000, Math.max(needed + 10, 120));
-  const concurrency = 8; // 보수적으로 시작
+  const needed = Math.max(emaShort, emaLong) + 10;
+  const limit = Math.min(1000, Math.max(needed + 10, 120));
+  const concurrency = 8; // conservative
   const cooldownMs = Math.max(1, parseInt(cfg.crossCooldownMinutes, 10) || DEFAULT_CONFIG.crossCooldownMinutes) * 60 * 1000;
 
   let idx = 0; const matches = [];
@@ -207,8 +224,8 @@ async function runScanOnce(env) {
       if (crossed(t, prevShort, prevLong, lastShort, lastLong)) {
         const key = `${sym}:${t}`;
         const lastTs = lastMap[key] || 0;
-  // 최근 중복 방지: 설정된 crossCooldownMinutes 내 재발송 제한
-  if (now - lastTs < cooldownMs) continue;
+        // cooldown guard
+        if (now - lastTs < cooldownMs) continue;
         const msg = (t === 'golden' ? '[골든]' : '[데드]') + ` ${sym} ${interval} EMA${emaShort}/${emaLong} @ ${new Date().toLocaleString('ko-KR')}`;
         const sent = await sendTelegram(env, msg);
         if (sent && sent.ok) { lastMap[key] = now; }
@@ -222,10 +239,9 @@ async function runScanOnce(env) {
       await Promise.all(batch.map(s => processSymbol(s)));
       idx += batch.length;
       scannedCount += batch.length;
-      if (idx < symbols.length) await new Promise(r => setTimeout(r, 150)); // 부하 완화
+      if (idx < symbols.length) await new Promise(r => setTimeout(r, 150));
     }
     state.lastRun = Date.now(); state.lastError = null;
-    // 최근 매칭을 누적 (최대 200개 유지)
     state.matches = Array.isArray(state.matches) ? [...matches, ...state.matches].slice(0, 200) : matches.slice(0, 200);
     state.lastScanDuration = Date.now() - startTime;
     state.scannedCount = scannedCount;
@@ -269,8 +285,10 @@ async function handlePostSymbols(request, env) {
 }
 
 async function handleGetScanState(env) { const st = await loadState(env); return new Response(JSON.stringify({ ok: true, state: st }), { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders() } }); }
-async function handleScanNow(env) {
-  const res = await runScanOnce(env);
+async function handleScanNow(request, env) {
+  let overrides = {};
+  try { overrides = await request.json(); } catch (e) { overrides = {}; }
+  const res = await runScanOnce(env, overrides);
   return new Response(JSON.stringify(res), { status: res.ok ? 200 : 500, headers: { 'Content-Type': 'application/json', ...corsHeaders() } });
 }
 
@@ -312,7 +330,7 @@ const workerExport = {
     if (pathname === '/symbols' && request.method === 'GET') return handleGetSymbols(env);
     if (pathname === '/symbols' && request.method === 'POST') return handlePostSymbols(request, env);
   if (pathname === '/scan-state' && request.method === 'GET') return handleGetScanState(env);
-  if (pathname === '/scan-now' && request.method === 'POST') return handleScanNow(env);
+  if (pathname === '/scan-now' && request.method === 'POST') return handleScanNow(request, env);
 
     return new Response('not found', { status: 404, headers: corsHeaders() });
   },
