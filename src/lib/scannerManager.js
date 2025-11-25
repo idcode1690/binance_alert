@@ -70,24 +70,53 @@ const scannerManager = (() => {
     if (typeof Worker !== 'undefined' && typeof window !== 'undefined') {
       try {
         workerInstance = new Worker('/worker-scanner.js');
-        workerInstance.onmessage = (ev) => {
+        let workerReady = false;
+        const onMsg = (ev) => {
           const m = ev.data || {};
           if (m.type === 'started') {
-            progress.total = m.total || progress.total; notifyThrottled(true);
+            workerReady = true; progress.total = m.total || progress.total; notifyThrottled(true);
           } else if (m.type === 'progress') {
-            progress.done = m.done || progress.done; currentSymbol = m.currentSymbol || currentSymbol; notifyThrottled();
+            workerReady = true; progress.done = m.done || progress.done; currentSymbol = m.currentSymbol || currentSymbol; notifyThrottled();
           } else if (m.type === 'match' && m.ev) {
-            results.unshift(m.ev); if (results.length > 500) results = results.slice(0, 500); notifyThrottled();
+            workerReady = true; results.unshift(m.ev); if (results.length > 500) results = results.slice(0, 500); notifyThrottled();
           } else if (m.type === 'done') {
-            progress.done = m.done || progress.done; running = false; currentSymbol = null; cancel = false; scanStartTime = null; notifyThrottled(true);
-            try { workerInstance.terminate(); } catch (e) {} workerInstance = null;
+            // worker finished its task
+            try { workerInstance.terminate(); } catch (e) {}
+            workerInstance = null; running = false; currentSymbol = null; cancel = false; scanStartTime = null; notifyThrottled(true);
           } else if (m.type === 'stopped') {
-            try { workerInstance.terminate(); } catch (e) {} workerInstance = null; running = false; currentSymbol = null; cancel = false; scanStartTime = null; notifyThrottled(true);
+            try { workerInstance.terminate(); } catch (e) {}
+            workerInstance = null; running = false; currentSymbol = null; cancel = false; scanStartTime = null; notifyThrottled(true);
           }
         };
+        workerInstance.addEventListener('message', onMsg);
+        workerInstance.addEventListener('error', (err) => {
+          try { console.warn('scanner worker error', err); } catch (e) {}
+        });
         // send start command with symbols and options
-        workerInstance.postMessage({ cmd: 'start', symbols: symbolsArray, opts, scanType: type });
-        return; // worker will handle the rest
+        try { workerInstance.postMessage({ cmd: 'start', symbols: symbolsArray, opts, scanType: type }); } catch (e) { /* ignore */ }
+
+        // Wait briefly for the worker to acknowledge (avoid stuck 'Scanning: ...' if worker asset missing or blocked)
+        const waitMs = 2000;
+        await new Promise((resolve) => {
+          const to = setTimeout(() => {
+            if (!workerReady) {
+              try { workerInstance.removeEventListener('message', onMsg); } catch (e) {}
+              try { workerInstance.terminate(); } catch (e) {}
+              workerInstance = null;
+            }
+            resolve();
+          }, waitMs);
+          // if worker signals readiness before timeout, resolve early
+          const early = () => { clearTimeout(to); resolve(); };
+          const checkInterval = setInterval(() => { if (workerReady) { clearInterval(checkInterval); early(); } }, 50);
+        });
+
+        // If worker started and is handling the scan, return early
+        if (workerInstance) {
+          // worker is active and will manage scanning
+          return;
+        }
+        // else fallthrough to inline scanner
       } catch (e) {
         try { if (workerInstance) { workerInstance.terminate(); workerInstance = null; } } catch (e2) {}
         // fallthrough to inline scanner
