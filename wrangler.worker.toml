@@ -10,6 +10,6 @@ crons = ["*/5 * * * *"]
 
 [[kv_namespaces]]
 binding = "KV_SCAN"
-# Cloudflare 대시보드 또는 wrangler로 생성한 KV 네임스페이스의 ID로 교체하세요
-id = "REPLACE_WITH_PRODUCTION_KV_ID"
-preview_id = "REPLACE_WITH_PREVIEW_KV_ID"
+# KV namespace removed to allow deploying when no KV is configured.
+# If you need persistence, create a KV namespace in Cloudflare and add the section back
+#+ with the proper `id` and `preview_id` values.
