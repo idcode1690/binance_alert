@@ -233,6 +233,32 @@ function App() {
     return null;
   })();
 
+  // If no runtime server override exists, attempt to auto-set it to the deployed
+  // Cloudflare Worker so users who open the app without configuring a server stop
+  // hitting stale pages.dev hosts. We do a short health check before persisting.
+  useEffect(() => {
+    try {
+      const lsVal = (typeof window !== 'undefined') ? (localStorage.getItem('serverUrl') || '') : '';
+      if (lsVal && lsVal.trim()) return; // already set by user
+      const candidate = 'https://binance-alert.idcode1690.workers.dev';
+      (async () => {
+        try {
+          const ctrl = new AbortController();
+          const to = setTimeout(() => { try { ctrl.abort(); } catch (e) {} }, 1500);
+          try {
+            const res = await fetch(`${candidate.replace(/\/$/, '')}/health`, { method: 'GET', signal: ctrl.signal });
+            if (res && res.ok) {
+              try { localStorage.setItem('serverUrl', candidate); sessionStorage.setItem('serverUrlReachable', '1'); } catch (e) {}
+              try { if (showToast) showToast('Server URL set to worker (auto)', true); } catch (e) {}
+            }
+          } catch (e) {
+            // health failed -> don't persist anything
+          } finally { clearTimeout(to); }
+        } catch (e) {}
+      })();
+    } catch (e) {}
+  }, []);
+
   // quick setter for serverUrl via prompt, stored in localStorage
   // Removed promptSetServerUrl (Controls component provides Set Server URL)
 
