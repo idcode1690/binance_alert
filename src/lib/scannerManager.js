@@ -65,7 +65,30 @@ const scannerManager = (() => {
     const emaShort = (opts && typeof opts.emaShort !== 'undefined') ? parseInt(opts.emaShort, 10) : 26;
     const emaLong = (opts && typeof opts.emaLong !== 'undefined') ? parseInt(opts.emaLong, 10) : 200;
     const filtered = (Array.isArray(list) ? list.filter(s => typeof s === 'string' && /USDT$/i.test(s)) : []);
+    // Validate symbols against Binance exchangeInfo to avoid scanning invalid/typo symbols
     progress.total = filtered.length; notifyThrottled(true);
+    try {
+      const infoUrl = 'https://fapi.binance.com/fapi/v1/exchangeInfo';
+      const infoResp = await fetch(infoUrl, { cf: { cacheTtl: 600 } });
+      if (infoResp && infoResp.ok) {
+        const info = await infoResp.json().catch(() => null);
+        if (info && Array.isArray(info.symbols)) {
+          const validSet = new Set(info.symbols.map(s => String(s.symbol).toUpperCase()));
+          const before = filtered.length;
+          const cleaned = filtered.map(s => String(s).toUpperCase()).filter(s => validSet.has(s));
+          if (cleaned.length !== before) {
+            try { console.log('[scannerManager] removed invalid symbols', { before, after: cleaned.length }); } catch (e) {}
+          }
+          // use cleaned list (preserve case as original list may vary)
+          const cleanedMap = new Map(); filtered.forEach(s => cleanedMap.set(String(s).toUpperCase(), s));
+          const finalList = cleaned.map(su => cleanedMap.get(su) || su);
+          // replace filtered variable
+          // eslint-disable-next-line no-param-reassign
+          filtered.length = 0; Array.prototype.push.apply(filtered, finalList);
+          progress.total = filtered.length; notifyThrottled(true);
+        }
+      }
+    } catch (e) { try { console.warn('[scannerManager] exchangeInfo fetch failed', e && e.message ? e.message : e); } catch (e2) {} }
     const endpointBase = 'https://fapi.binance.com/fapi/v1/klines';
 
     // Try to delegate scanning to dedicated worker (served at /worker-scanner.js)
