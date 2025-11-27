@@ -55,6 +55,7 @@ const scannerManager = (() => {
 
   async function start(type, opts = {}) {
     if (running) return;
+    try { console.log('[scannerManager] start called', { type, opts }); } catch (e) {}
     if (typeof getSymbolsFn !== 'function') throw new Error('scannerManager: getSymbolsFn not set');
     running = true; cancel = false; results = []; progress = { done: 0, total: 0 }; currentSymbol = null; scanType = type || null; scanStartTime = Date.now();
     notifyThrottled(true);
@@ -71,6 +72,7 @@ const scannerManager = (() => {
     const symbolsArray = Array.isArray(list) ? list : [];
     // Only delegate to the dedicated worker for single-run scans.
     // For continuous monitoring (`opts.monitor`), run inline loop to allow repeated passes.
+    try { console.log('[scannerManager] monitorMode?', !!(opts && opts.monitor)); } catch (e) {}
     if (!opts.monitor && typeof Worker !== 'undefined' && typeof window !== 'undefined') {
       try {
         workerInstance = new Worker('/worker-scanner.js');
@@ -226,7 +228,10 @@ const scannerManager = (() => {
       try { console.log('[scannerManager] runFullPass done', { processed: i, time: new Date().toISOString() }); } catch (e) {}
     }
     try {
+      let passCount = 0;
       do {
+        passCount += 1;
+        try { console.log('[scannerManager] monitoring pass start', { passCount, monitorMode, time: new Date().toISOString() }); } catch (e) {}
         // reset progress for this pass
         progress.done = 0; progress.total = filtered.length; notifyThrottled(true);
         await runFullPass();
@@ -242,7 +247,9 @@ const scannerManager = (() => {
         }
         const step = 1000;
         let slept = 0;
+        try { console.log('[scannerManager] waiting between passes', { waitMs }); } catch (e) {}
         while (slept < waitMs && !cancel) { const to = Math.min(step, waitMs - slept); await sleep(to); slept += to; }
+        try { console.log('[scannerManager] waiting complete', { passCount, time: new Date().toISOString() }); } catch (e) {}
       } while (!cancel);
     } catch (err) { try { console.error('scannerManager.start error', err && err.message ? err.message : err); } catch (e) {} }
     finally { try { for (const c of currentAbortControllers) { try { c.abort(); } catch (e) {} } } catch (e) {} currentAbortControllers.clear(); running = false; currentSymbol = null; cancel = false; scanStartTime = null; scanType = null; notifyThrottled(true); }
