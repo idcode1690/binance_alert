@@ -674,7 +674,9 @@ function App() {
                 setMonitorEma2={setMonitorEma2}
                 monitorConfirm={monitorConfirm}
                 setMonitorConfirm={setMonitorConfirm}
-                
+                // pass serverUrl and toast helper so Controls can manage runtime server setting
+                serverUrl={serverUrl}
+                showToast={showToast}
               />
               {/* 간단한 로딩 표시: 심볼 변경으로 상태가 reloading일 때 보임 */}
               {status === 'reloading' && (
