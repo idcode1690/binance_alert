@@ -5,6 +5,8 @@ const scannerManager = (() => {
   let scanType = null;
   let progress = { done: 0, total: 0 };
   let results = [];
+  // activeMatches: map of symbol -> active match info for real-time monitoring
+  let activeMatches = {};
   try { if (typeof window !== 'undefined' && window.localStorage) { const raw = window.localStorage.getItem('scannerResults'); if (raw) results = JSON.parse(raw) || []; } } catch (e) { results = []; }
   let cancel = false;
   let scanStartTime = null;
@@ -15,7 +17,7 @@ const scannerManager = (() => {
   // throttle notifications to reduce render overhead
   let lastNotifyTs = 0; let pendingNotify = false;
 
-  function stateSnapshot() { return { running, currentSymbol, scanType, progress: { ...progress }, results: results.slice(), scanStartTime }; }
+  function stateSnapshot() { return { running, currentSymbol, scanType, progress: { ...progress }, results: results.slice(), active: Object.values(activeMatches), scanStartTime }; }
   function notifyNow() {
     const s = stateSnapshot();
     for (const cb of listeners) { try { cb(s); } catch (e) {} }
@@ -163,19 +165,34 @@ const scannerManager = (() => {
           if (scanType === 'golden') matched = (prevShort <= prevLong && lastShort > lastLong);
           else if (scanType === 'dead') matched = (prevShort >= prevLong && lastShort < lastLong);
         }
+        const lastVolume = (Array.isArray(data) && data[lastClosedIdx] && data[lastClosedIdx][5] != null) ? parseFloat(data[lastClosedIdx][5]) : 0;
+        // Real-time monitoring behavior: maintain activeMatches map. When a symbol becomes matched, add it; when it stops matching, remove it.
         if (matched) {
-          const lastVolume = (Array.isArray(data) && data[lastIdx] && data[lastIdx][5] != null) ? parseFloat(data[lastIdx][5]) : 0;
-          // include previous EMA values for easier debugging of why a match was detected
-          const ev = { id: `${sym}-${Date.now()}-${Math.random().toString(36).slice(2,8)}`, symbol: sym, prevShort, prevLong, lastShort, lastLong, time: new Date().toLocaleString(), interval, emaShort, emaLong, type: scanType, volume: lastVolume };
-          results.unshift(ev); if (results.length > 500) results = results.slice(0, 500);
-          notifyThrottled();
+          if (!activeMatches[sym]) {
+            const ev = { id: `${sym}-${Date.now()}-${Math.random().toString(36).slice(2,8)}`, symbol: sym, prevShort, prevLong, lastShort, lastLong, time: new Date().toLocaleString(), interval, emaShort, emaLong, type: scanType, volume: lastVolume };
+            activeMatches[sym] = ev;
+            // also keep history results for reference
+            results.unshift(ev); if (results.length > 500) results = results.slice(0, 500);
+            notifyThrottled();
+          } else {
+            // update existing active entry with latest values
+            activeMatches[sym] = { ...activeMatches[sym], prevShort, prevLong, lastShort, lastLong, time: new Date().toLocaleString(), volume: lastVolume };
+          }
+        } else {
+          if (activeMatches[sym]) {
+            delete activeMatches[sym];
+            notifyThrottled();
+          }
         }
       } catch (e) { /* ignore */ }
       finally { if (localAbort) currentAbortControllers.delete(localAbort); progress.done += 1; notifyThrottled(); }
     };
 
-    let i = 0;
-    try {
+    // support continuous monitoring mode: if opts.monitor=true, repeat full passes until stopped
+    const monitorMode = !!(opts && opts.monitor);
+    const pollIntervalMs = (opts && typeof opts.pollIntervalMs === 'number') ? Math.max(1000, opts.pollIntervalMs) : null;
+    async function runFullPass() {
+      let i = 0;
       while (i < filtered.length) {
         if (cancel) break;
         const currentConcurrency = Math.max(1, Math.floor(concurrencyCurrent));
@@ -199,6 +216,26 @@ const scannerManager = (() => {
           } catch (e) { /* ignore */ }
         }
       }
+    }
+    try {
+      do {
+        // reset progress for this pass
+        progress.done = 0; progress.total = filtered.length; notifyThrottled(true);
+        await runFullPass();
+        if (cancel) break;
+        // if not monitoring, break after one pass
+        if (!monitorMode) break;
+        // wait for poll interval (default to interval minutes + 5 seconds if not provided)
+        let waitMs = pollIntervalMs;
+        if (!waitMs) {
+          // try to derive from interval string like '5m'
+          const m = String(interval || '').match(/^(\d+)m$/);
+          if (m) { waitMs = parseInt(m[1], 10) * 60 * 1000 + 5000; } else { waitMs = 30000; }
+        }
+        const step = 1000;
+        let slept = 0;
+        while (slept < waitMs && !cancel) { const to = Math.min(step, waitMs - slept); await sleep(to); slept += to; }
+      } while (!cancel);
     } catch (err) { try { console.error('scannerManager.start error', err && err.message ? err.message : err); } catch (e) {} }
     finally { try { for (const c of currentAbortControllers) { try { c.abort(); } catch (e) {} } } catch (e) {} currentAbortControllers.clear(); running = false; currentSymbol = null; cancel = false; scanStartTime = null; scanType = null; notifyThrottled(true); }
   }
@@ -219,6 +256,7 @@ const scannerManager = (() => {
   function getState() { return stateSnapshot(); }
   function removeResult(id) { if (!id) return; results = results.filter(r => r.id !== id); notifyThrottled(); }
   function clearResults() { results = []; notifyThrottled(true); }
+  function removeActive(symbol) { if (!symbol) return; if (activeMatches[symbol]) { delete activeMatches[symbol]; notifyThrottled(true); } }
 
   return { onUpdate, setGetSymbols, start, stop, getState, removeResult, clearResults };
 })();

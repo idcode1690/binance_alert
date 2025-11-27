@@ -108,14 +108,18 @@ export default function ScannerPage({ availableSymbols, fetchExchangeInfo, monit
         setUiScanType(null);
         return;
       }
+      const intervalVal = Number.isFinite(mins) && mins > 0 ? mins : monitorMinutes;
       const opts = {
-        interval: Number.isFinite(mins) && mins > 0 ? mins : monitorMinutes,
+        interval: intervalVal,
         emaShort: Number.isFinite(ema1) && ema1 > 0 ? ema1 : monitorEma1,
         emaLong: Number.isFinite(ema2) && ema2 > 0 ? ema2 : monitorEma2,
+        // real-time monitoring mode
+        monitor: true,
+        pollIntervalMs: (Number.isFinite(intervalVal) ? (intervalVal * 60 * 1000 + 5000) : undefined),
         // conservative runtime options to avoid hitting API rate limits on start
-        concurrency: 1,
-        batchDelay: 1000,
-        maxConcurrency: 2,
+        concurrency: 2,
+        batchDelay: 200,
+        maxConcurrency: 4,
       };
       scannerManager.start('golden', opts);
       // persist scanner choices as defaults
@@ -136,14 +140,16 @@ export default function ScannerPage({ availableSymbols, fetchExchangeInfo, monit
         setUiScanType(null);
         return;
       }
+      const intervalVal2 = Number.isFinite(mins) && mins > 0 ? mins : monitorMinutes;
       const opts = {
-        interval: Number.isFinite(mins) && mins > 0 ? mins : monitorMinutes,
+        interval: intervalVal2,
         emaShort: Number.isFinite(ema1) && ema1 > 0 ? ema1 : monitorEma1,
         emaLong: Number.isFinite(ema2) && ema2 > 0 ? ema2 : monitorEma2,
-        // conservative runtime options to avoid hitting API rate limits on start
-        concurrency: 1,
-        batchDelay: 1000,
-        maxConcurrency: 2,
+        monitor: true,
+        pollIntervalMs: (Number.isFinite(intervalVal2) ? (intervalVal2 * 60 * 1000 + 5000) : undefined),
+        concurrency: 2,
+        batchDelay: 200,
+        maxConcurrency: 4,
       };
       scannerManager.start('dead', opts);
       // persist scanner choices as defaults
@@ -223,14 +229,25 @@ export default function ScannerPage({ availableSymbols, fetchExchangeInfo, monit
   // play beep when a new match is detected (no modal)
   useEffect(() => {
     try {
-      if (!results || results.length === 0) return;
-      const top = results[0];
-      if (!top) return;
-      const id = (top && top.id) ? top.id : `${top.symbol || ''}::${top.time || ''}::${top.emaShort || ''}::${top.emaLong || ''}`;
-      if (shownResultsRef.current.has(id)) return;
-      // mark shown and play beep only for new results
-      shownResultsRef.current.add(id);
-      try { beep(); } catch (e) {}
+      // prefer active list for monitoring notifications
+      const active = Array.isArray(state.active) ? state.active : [];
+      if (active && active.length > 0) {
+        const top = active[0];
+        const id = (top && top.id) ? top.id : `${top.symbol || ''}::${top.time || ''}::${top.emaShort || ''}::${top.emaLong || ''}`;
+        if (!shownResultsRef.current.has(id)) {
+          shownResultsRef.current.add(id);
+          try { beep(); } catch (e) {}
+        }
+      } else {
+        // fallback to historical results
+        if (!results || results.length === 0) return;
+        const top = results[0];
+        if (!top) return;
+        const id = (top && top.id) ? top.id : `${top.symbol || ''}::${top.time || ''}::${top.emaShort || ''}::${top.emaLong || ''}`;
+        if (shownResultsRef.current.has(id)) return;
+        shownResultsRef.current.add(id);
+        try { beep(); } catch (e) {}
+      }
     } catch (e) {}
   }, [results]);
 
@@ -307,67 +324,95 @@ export default function ScannerPage({ availableSymbols, fetchExchangeInfo, monit
         </div>
       </div>
 
+      {/* Active monitoring list: shows currently-active crosses (real-time). Falls back to historical results. */}
       <ul className="alerts-list">
-        {results.length === 0 ? (
-          <li className="alert-item no-results">No matches yet.</li>
-        ) : (
-          results.map((r, idx) => (
-            <li key={r.id || `${r.symbol}-${idx}`} className="alert-item">
+        {Array.isArray(state.active) && state.active.length > 0 ? (
+          state.active.map((r, idx) => (
+            <li key={r.id || `${r.symbol}-active-${idx}`} className="alert-item">
               <div className="alert-left">
-                {/* color indicator per-result (use result.type if available, else fall back to current scanType) */}
                 {(() => {
                   const t = (r && r.type) ? r.type : (state && state.scanType ? state.scanType : null);
                   const cls = t === 'dead' ? 'bear' : (t === 'golden' ? 'bull' : 'bull');
                   return <span className={`alert-indicator ${cls}`} />;
                 })()}
-                <button
-                  type="button"
-                  className={`alert-symbol copy-btn ${copiedSymbol === r.symbol ? 'copied' : ''}`}
-                  title="Copy symbol to clipboard"
-                  onClick={async (e) => {
-                    e.preventDefault();
-                    try {
-                      if (navigator && navigator.clipboard && navigator.clipboard.writeText) {
-                        await navigator.clipboard.writeText(r.symbol);
-                      } else {
-                        // fallback for older browsers
-                        const ta = document.createElement('textarea');
-                        ta.value = r.symbol;
-                        document.body.appendChild(ta);
-                        ta.select();
-                        document.execCommand('copy');
-                        document.body.removeChild(ta);
-                      }
-                      setCopiedSymbol(r.symbol);
-                      setTimeout(() => setCopiedSymbol(null), 1200);
-                    } catch (err) {
-                      // ignore copy failures
-                    }
-                  }}
-                >
+                <button type="button" className={`alert-symbol copy-btn ${copiedSymbol === r.symbol ? 'copied' : ''}`} title="Copy symbol" onClick={async (e) => { e.preventDefault(); try { if (navigator && navigator.clipboard && navigator.clipboard.writeText) { await navigator.clipboard.writeText(r.symbol); } else { const ta = document.createElement('textarea'); ta.value = r.symbol; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); } setCopiedSymbol(r.symbol); setTimeout(() => setCopiedSymbol(null), 1200); } catch (err) {} }}>
                   {r.symbol}
                 </button>
               </div>
               <div className="alert-body">
                 <div className="alert-info">
-                {(() => {
-                  const tt = (r && r.type) ? r.type : (state && state.scanType ? state.scanType : null);
-                  const label = tt === 'dead' ? 'Bear' : (tt === 'golden' ? 'Bull' : 'Match');
-                  return <div className="alert-type-short">{label}</div>;
-                })()}
+                  {(() => { const tt = (r && r.type) ? r.type : (state && state.scanType ? state.scanType : null); const label = tt === 'dead' ? 'Bear' : (tt === 'golden' ? 'Bull' : 'Match'); return <div className="alert-type-short">{label}</div>; })()}
                   <div className="alert-time">{r.time}</div>
                 </div>
-                  <div className="alert-right">
-                  <div className="alert-volume" title={`Volume: ${r.volume || 0}`}>
-                    Vol: {formatVolume(r.volume)}
-                  </div>
-                  <button type="button" className="delete-result" title="Remove" onClick={() => { try { scannerManager.removeResult(r.id); } catch (e) {} }}>
+                <div className="alert-right">
+                  <div className="alert-volume" title={`Volume: ${r.volume || 0}`}>Vol: {formatVolume(r.volume)}</div>
+                  <button type="button" className="delete-result" title="Remove from active" onClick={() => { try { scannerManager.removeActive(r.symbol); } catch (e) {} }}>
                     ✕
                   </button>
                 </div>
               </div>
             </li>
           ))
+        ) : (
+          results.length === 0 ? (
+            <li className="alert-item no-results">No matches yet.</li>
+          ) : (
+            results.map((r, idx) => (
+              <li key={r.id || `${r.symbol}-${idx}`} className="alert-item">
+                <div className="alert-left">
+                  {(() => {
+                    const t = (r && r.type) ? r.type : (state && state.scanType ? state.scanType : null);
+                    const cls = t === 'dead' ? 'bear' : (t === 'golden' ? 'bull' : 'bull');
+                    return <span className={`alert-indicator ${cls}`} />;
+                  })()}
+                  <button
+                    type="button"
+                    className={`alert-symbol copy-btn ${copiedSymbol === r.symbol ? 'copied' : ''}`}
+                    title="Copy symbol to clipboard"
+                    onClick={async (e) => {
+                      e.preventDefault();
+                      try {
+                        if (navigator && navigator.clipboard && navigator.clipboard.writeText) {
+                          await navigator.clipboard.writeText(r.symbol);
+                        } else {
+                          const ta = document.createElement('textarea');
+                          ta.value = r.symbol;
+                          document.body.appendChild(ta);
+                          ta.select();
+                          document.execCommand('copy');
+                          document.body.removeChild(ta);
+                        }
+                        setCopiedSymbol(r.symbol);
+                        setTimeout(() => setCopiedSymbol(null), 1200);
+                      } catch (err) {
+                        // ignore copy failures
+                      }
+                    }}
+                  >
+                    {r.symbol}
+                  </button>
+                </div>
+                <div className="alert-body">
+                  <div className="alert-info">
+                  {(() => {
+                    const tt = (r && r.type) ? r.type : (state && state.scanType ? state.scanType : null);
+                    const label = tt === 'dead' ? 'Bear' : (tt === 'golden' ? 'Bull' : 'Match');
+                    return <div className="alert-type-short">{label}</div>;
+                  })()}
+                    <div className="alert-time">{r.time}</div>
+                  </div>
+                    <div className="alert-right">
+                    <div className="alert-volume" title={`Volume: ${r.volume || 0}`}>
+                      Vol: {formatVolume(r.volume)}
+                    </div>
+                    <button type="button" className="delete-result" title="Remove" onClick={() => { try { scannerManager.removeResult(r.id); } catch (e) {} }}>
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              </li>
+            ))
+          )
         )}
       </ul>
     </div>
