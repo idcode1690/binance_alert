@@ -239,8 +239,26 @@ function App() {
   // 서버측 스캔 설정을 프론트 변경값과 동기화 (EMA/분) — 프론트에서 한번 설정하면 서버가 값을 유지
   useEffect(() => {
     if (!serverUrl) return;
+    // If the runtime serverUrl contains known problematic hostnames (e.g. Pages preview),
+    // don't attempt the automatic POST which causes repeated DNS errors in user's console.
+    try {
+      const lower = (serverUrl || '').toLowerCase();
+      if (lower.includes('pages.dev')) {
+        try { localStorage.removeItem('serverUrl'); } catch (e) {}
+        try { showToast('Removed invalid server URL (pages.dev). Please set a valid server URL.', false); } catch (e) {}
+        return;
+      }
+    } catch (e) {}
+
+    // Only auto-sync if the server was previously verified reachable in this session,
+    // or if the server is same-origin. This avoids blind POST attempts to unreachable hosts.
+    const isSameOrigin = (() => {
+      try { return typeof window !== 'undefined' && window.location && window.location.origin && serverUrl === window.location.origin.replace(/\/$/, ''); } catch (e) { return false; }
+    })();
+    const sessionOk = (() => { try { return sessionStorage.getItem('serverUrlReachable') === '1'; } catch (e) { return false; } })();
+
     const ctrl = new AbortController();
-    const t = setTimeout(async () => {
+    const performPost = async () => {
       try {
         const payload = { interval: monitorMinutes, emaShort: monitorEma1, emaLong: monitorEma2, scanType: 'both' };
         const res = await fetch(`${serverUrl}/config`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), signal: ctrl.signal });
@@ -248,11 +266,41 @@ function App() {
           console.warn('[App] /config sync failed', res.status);
         }
       } catch (e) {
-        // Network/DNS failure (e.g. ERR_NAME_NOT_RESOLVED) — remove any runtime override so the app
-        // falls back to same-origin or build-time server on next load. Inform the user.
         try { console.warn('[App] /config sync error', e); } catch (err) {}
         try { localStorage.removeItem('serverUrl'); } catch (err) {}
         try { showToast('Server URL removed due to network error. Please reload the page.', false); } catch (err) {}
+      }
+    };
+
+    const t = setTimeout(async () => {
+      // If same-origin or we've seen the server reachable in this session, post immediately.
+      if (isSameOrigin || sessionOk) {
+        await performPost();
+        return;
+      }
+
+      // Otherwise, do a lightweight health check with short timeout. If it succeeds, mark session ok and post.
+      let healthOk = false;
+      try {
+        const healthCtrl = new AbortController();
+        const healthTimeout = setTimeout(() => { try { healthCtrl.abort(); } catch (e) {} }, 1500);
+        try {
+          const hres = await fetch(`${serverUrl.replace(/\/$/, '')}/health`, { method: 'GET', signal: healthCtrl.signal });
+          if (hres && hres.ok) {
+            healthOk = true;
+            try { sessionStorage.setItem('serverUrlReachable', '1'); } catch (e) {}
+          }
+        } catch (e) {
+          healthOk = false;
+        } finally { clearTimeout(healthTimeout); }
+      } catch (e) { healthOk = false; }
+
+      if (healthOk) {
+        await performPost();
+      } else {
+        // Avoid attempting the POST if health check failed — remove runtime override to stop further errors
+        try { localStorage.removeItem('serverUrl'); } catch (e) {}
+        try { showToast('Server unreachable — cleared configured server URL. Please set a valid server URL.', false); } catch (e) {}
       }
     }, 200);
     return () => { try { ctrl.abort(); } catch (e) {} clearTimeout(t); };
