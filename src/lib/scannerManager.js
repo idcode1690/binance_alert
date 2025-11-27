@@ -170,18 +170,22 @@ const scannerManager = (() => {
         const lastVolume = (Array.isArray(data) && data[lastClosedIdx] && data[lastClosedIdx][5] != null) ? parseFloat(data[lastClosedIdx][5]) : 0;
         // Real-time monitoring behavior: maintain activeMatches map. When a symbol becomes matched, add it; when it stops matching, remove it.
         if (matched) {
+          try { console.log('[scannerManager] match detected', sym, { scanType, emaShort, emaLong }); } catch (e) {}
           if (!activeMatches[sym]) {
             const ev = { id: `${sym}-${Date.now()}-${Math.random().toString(36).slice(2,8)}`, symbol: sym, prevShort, prevLong, lastShort, lastLong, time: new Date().toLocaleString(), interval, emaShort, emaLong, type: scanType, volume: lastVolume };
             activeMatches[sym] = ev;
             // also keep history results for reference
             results.unshift(ev); if (results.length > 500) results = results.slice(0, 500);
             notifyThrottled();
+            try { console.log('[scannerManager] active add', sym); } catch (e) {}
           } else {
             // update existing active entry with latest values
             activeMatches[sym] = { ...activeMatches[sym], prevShort, prevLong, lastShort, lastLong, time: new Date().toLocaleString(), volume: lastVolume };
+            try { console.log('[scannerManager] active update', sym); } catch (e) {}
           }
         } else {
           if (activeMatches[sym]) {
+            try { console.log('[scannerManager] match cleared', sym); } catch (e) {}
             delete activeMatches[sym];
             notifyThrottled();
           }
@@ -195,6 +199,7 @@ const scannerManager = (() => {
     const pollIntervalMs = (opts && typeof opts.pollIntervalMs === 'number') ? Math.max(1000, opts.pollIntervalMs) : null;
     async function runFullPass() {
       let i = 0;
+      try { console.log('[scannerManager] runFullPass start', { scanType, interval, total: filtered.length, time: new Date().toISOString() }); } catch (e) {}
       while (i < filtered.length) {
         if (cancel) break;
         const currentConcurrency = Math.max(1, Math.floor(concurrencyCurrent));
@@ -218,6 +223,7 @@ const scannerManager = (() => {
           } catch (e) { /* ignore */ }
         }
       }
+      try { console.log('[scannerManager] runFullPass done', { processed: i, time: new Date().toISOString() }); } catch (e) {}
     }
     try {
       do {
