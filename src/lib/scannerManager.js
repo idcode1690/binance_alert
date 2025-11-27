@@ -69,7 +69,9 @@ const scannerManager = (() => {
 
     // Try to delegate scanning to dedicated worker (served at /worker-scanner.js)
     const symbolsArray = Array.isArray(list) ? list : [];
-    if (typeof Worker !== 'undefined' && typeof window !== 'undefined') {
+    // Only delegate to the dedicated worker for single-run scans.
+    // For continuous monitoring (`opts.monitor`), run inline loop to allow repeated passes.
+    if (!opts.monitor && typeof Worker !== 'undefined' && typeof window !== 'undefined') {
       try {
         workerInstance = new Worker('/worker-scanner.js');
         let workerReady = false;
