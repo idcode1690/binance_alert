@@ -247,7 +247,13 @@ function App() {
         if (!res.ok) {
           console.warn('[App] /config sync failed', res.status);
         }
-      } catch (e) { /* no-op */ }
+      } catch (e) {
+        // Network/DNS failure (e.g. ERR_NAME_NOT_RESOLVED) — remove any runtime override so the app
+        // falls back to same-origin or build-time server on next load. Inform the user.
+        try { console.warn('[App] /config sync error', e); } catch (err) {}
+        try { localStorage.removeItem('serverUrl'); } catch (err) {}
+        try { showToast('Server URL removed due to network error. Please reload the page.', false); } catch (err) {}
+      }
     }, 200);
     return () => { try { ctrl.abort(); } catch (e) {} clearTimeout(t); };
   }, [serverUrl, monitorMinutes, monitorEma1, monitorEma2]);

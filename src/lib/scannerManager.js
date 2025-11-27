@@ -170,10 +170,25 @@ const scannerManager = (() => {
       try {
         const r = await fetch(url, localAbort ? { signal: localAbort.signal } : undefined);
         if (!r.ok) {
+          // Too many requests -> backoff and retry later
           if (r.status === 429) {
             backoffCount += 1; consecutiveSuccesses = 0; concurrencyCurrent = Math.max(1, Math.floor(concurrencyCurrent * 0.6)); batchDelayCurrent = Math.min(30000, Math.floor(batchDelayCurrent * 1.6));
             const backoffMs = Math.min(30000, 1000 * Math.pow(2, Math.min(backoffCount, 6)) + Math.floor(Math.random() * 1000));
             await sleep(backoffMs);
+            return;
+          }
+          // Bad request often means an invalid symbol (typo or delisted). Remove it to avoid repeated 400s.
+          if (r.status === 400) {
+            try { console.warn('[scannerManager] removing invalid symbol due to 400', sym); } catch (e) {}
+            try {
+              const idx = filtered.indexOf(sym);
+              if (idx !== -1) {
+                filtered.splice(idx, 1);
+                progress.total = filtered.length;
+                notifyThrottled(true);
+              }
+            } catch (e) {}
+            return;
           }
           return;
         }
