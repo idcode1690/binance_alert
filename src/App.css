@@ -333,6 +333,10 @@ button.secondary {
   max-width: 160px;
   display: flex;
   align-items: center;
+  gap: 8px;
+  flex: none;
+}
+
 /* Price number alignment: use tabular numbers and fixed min-widths so decimals align */
 .alert-price {
   display: flex;
@@ -350,9 +354,6 @@ button.secondary {
 .alert-price .price-sep {
   color: var(--muted);
   font-weight: 600;
-}
-  gap: 8px;
-  flex: none;
 }
 .alert-indicator {
   width: 10px;

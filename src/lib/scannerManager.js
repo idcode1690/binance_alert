@@ -160,7 +160,12 @@ const scannerManager = (() => {
     const successThreshold = (opts && typeof opts.rampSuccessThreshold === 'number') ? Math.max(1, opts.rampSuccessThreshold) : 3;
     const minBatchDelay = (opts && typeof opts.minBatchDelay === 'number') ? Math.max(50, opts.minBatchDelay) : 60;
     const neededCandles = Math.max(emaShort, emaLong) + 10;
-    const candleLimit = Math.min(1000, Math.max(neededCandles + 10, 120));
+    // Allow caller to request a specific kline limit (e.g., 200). If not provided,
+    // fall back to previous heuristic which ensured at least ~120 candles.
+    const klineLimitOpt = (opts && typeof opts.klineLimit === 'number') ? Math.max(0, parseInt(opts.klineLimit, 10)) : null;
+    const candleLimit = (Number.isFinite(klineLimitOpt) && klineLimitOpt > 0)
+      ? Math.min(1000, Math.max(klineLimitOpt, neededCandles + 1))
+      : Math.min(1000, Math.max(neededCandles + 10, 120));
 
     const processSymbol = async (sym) => {
       if (cancel) return;
