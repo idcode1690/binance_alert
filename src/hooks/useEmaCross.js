@@ -249,8 +249,11 @@ export default function useEmaCross({ symbol = 'BTCUSDT', autoConnect = true, de
               ema9ConfirmedRef.current = ema9Ref.current;
               ema26ConfirmedRef.current = ema26Ref.current;
             }
+            const prevShort = (typeof ema9ConfirmedRef.current === 'number') ? ema9ConfirmedRef.current : null;
+            const prevLong = (typeof ema26ConfirmedRef.current === 'number') ? ema26ConfirmedRef.current : null;
             const newEma9c = updateEMA(ema9ConfirmedRef.current, close, emaShort);
             const newEma26c = updateEMA(ema26ConfirmedRef.current, close, emaLong);
+            // update confirmed refs
             ema9ConfirmedRef.current = newEma9c;
             ema26ConfirmedRef.current = newEma26c;
             // sync preview to confirmed after closed candle to avoid drift
@@ -260,6 +263,18 @@ export default function useEmaCross({ symbol = 'BTCUSDT', autoConnect = true, de
             setEma26(newEma26c);
             // closed candle: also record the closed price as the authoritative lastPrice
             setLastPrice(close);
+            // Determine whether an actual cross occurred between the previous confirmed
+            // EMAs and the newly computed confirmed EMAs. A cross is defined as a
+            // sign change: prevShort <= prevLong && newShort > newLong => golden
+            // prevShort >= prevLong && newShort < newLong => dead
+            let detectedCross = null;
+            try {
+              if (prevShort != null && prevLong != null) {
+                if (prevShort <= prevLong && newEma9c > newEma26c) detectedCross = 'bull';
+                else if (prevShort >= prevLong && newEma9c < newEma26c) detectedCross = 'bear';
+                else detectedCross = null; // no crossing event
+              }
+            } catch (e) { detectedCross = null; }
           }
 
           // Do not update `cross` for preview/partial candles here; cross will be
@@ -271,31 +286,33 @@ export default function useEmaCross({ symbol = 'BTCUSDT', autoConnect = true, de
               if (closeTime && (!lastProcessedCloseRef.current || closeTime > lastProcessedCloseRef.current)) {
                 lastProcessedCloseRef.current = closeTime;
                 // compute confirmed cross using confirmed EMA refs (fallback to preview values)
-                const confirmedNewCross = (ema9ConfirmedRef.current != null && ema26ConfirmedRef.current != null)
-                  ? (ema9ConfirmedRef.current > ema26ConfirmedRef.current ? 'bull' : 'bear')
-                  : ((ema9Ref.current != null && ema26Ref.current != null) ? (ema9Ref.current > ema26Ref.current ? 'bull' : 'bear') : null);
-                if (debug) console.debug('[useEmaCross] closed candle detected', { closeTime, close, ema9Confirmed: ema9ConfirmedRef.current, ema26Confirmed: ema26ConfirmedRef.current, ema9Preview: ema9Ref.current, ema26Preview: ema26Ref.current, confirmedNewCross });
-                // Apply confirmation: require the same cross for `confirmClosedCandles` consecutive closed candles
-                if (confirmedNewCross != null) {
-                  if (candidateConfirmedRef.current === confirmedNewCross) {
+                // Only consider a confirmed cross when we detect an actual crossing event
+                // between the previous confirmed EMAs and the newly computed confirmed EMAs.
+                if (debug) console.debug('[useEmaCross] closed candle detected', { closeTime, close, ema9Confirmed: ema9ConfirmedRef.current, ema26Confirmed: ema26ConfirmedRef.current, ema9Preview: ema9Ref.current, ema26Preview: ema26Ref.current, detectedCross });
+                if (detectedCross != null) {
+                  if (candidateConfirmedRef.current === detectedCross) {
                     candidateCountRef.current = (candidateCountRef.current || 0) + 1;
                   } else {
-                    candidateConfirmedRef.current = confirmedNewCross;
+                    candidateConfirmedRef.current = detectedCross;
                     candidateCountRef.current = 1;
                   }
                   if (debug) console.debug('[useEmaCross] candidateConfirmed state', { candidateConfirmed: candidateConfirmedRef.current, candidateCount: candidateCountRef.current, required: confirmClosedCandles });
                   if (candidateCountRef.current >= confirmClosedCandles) {
-                    if (prevConfirmedRef.current !== confirmedNewCross) {
-                      prevConfirmedRef.current = confirmedNewCross;
-                      setConfirmedCross(confirmedNewCross);
+                    if (prevConfirmedRef.current !== detectedCross) {
+                      prevConfirmedRef.current = detectedCross;
+                      setConfirmedCross(detectedCross);
                       setConfirmedSource('ws');
                       // also update public `cross` so UI reflects the closed-candle decision
-                      if (prevCrossRef.current !== confirmedNewCross) {
-                        prevCrossRef.current = confirmedNewCross;
-                        setCross(confirmedNewCross);
+                      if (prevCrossRef.current !== detectedCross) {
+                        prevCrossRef.current = detectedCross;
+                        setCross(detectedCross);
                       }
                     }
                   }
+                } else {
+                  // No crossing event: reset candidate tracking so we only detect real cross events
+                  candidateConfirmedRef.current = null;
+                  candidateCountRef.current = 0;
                 }
               }
               } catch (e) {
@@ -376,6 +393,8 @@ export default function useEmaCross({ symbol = 'BTCUSDT', autoConnect = true, de
                     ema9ConfirmedRef.current = ema9Ref.current;
                     ema26ConfirmedRef.current = ema26Ref.current;
                   }
+                  const prevShort = (typeof ema9ConfirmedRef.current === 'number') ? ema9ConfirmedRef.current : null;
+                  const prevLong = (typeof ema26ConfirmedRef.current === 'number') ? ema26ConfirmedRef.current : null;
                   const newEma9c = updateEMA(ema9ConfirmedRef.current, close, emaShort);
                   const newEma26c = updateEMA(ema26ConfirmedRef.current, close, emaLong);
                   ema9ConfirmedRef.current = newEma9c;
@@ -385,11 +404,36 @@ export default function useEmaCross({ symbol = 'BTCUSDT', autoConnect = true, de
                   ema26Ref.current = newEma26c;
                   setEma9(newEma9c);
                   setEma26(newEma26c);
-                  const newCross = newEma9c > newEma26c ? 'bull' : 'bear';
-                  if (prevConfirmedRef.current !== newCross) {
-                    prevConfirmedRef.current = newCross;
-                    setConfirmedCross(newCross);
-                    setConfirmedSource('poll');
+                  // detect actual crossing event between previous confirmed EMAs and new confirmed EMAs
+                  let detectedCross = null;
+                  try {
+                    if (prevShort != null && prevLong != null) {
+                      if (prevShort <= prevLong && newEma9c > newEma26c) detectedCross = 'bull';
+                      else if (prevShort >= prevLong && newEma9c < newEma26c) detectedCross = 'bear';
+                      else detectedCross = null;
+                    }
+                  } catch (e) { detectedCross = null; }
+                  if (detectedCross != null) {
+                    if (candidateConfirmedRef.current === detectedCross) {
+                      candidateCountRef.current = (candidateCountRef.current || 0) + 1;
+                    } else {
+                      candidateConfirmedRef.current = detectedCross;
+                      candidateCountRef.current = 1;
+                    }
+                    if (candidateCountRef.current >= confirmClosedCandles) {
+                      if (prevConfirmedRef.current !== detectedCross) {
+                        prevConfirmedRef.current = detectedCross;
+                        setConfirmedCross(detectedCross);
+                        setConfirmedSource('poll');
+                        if (prevCrossRef.current !== detectedCross) {
+                          prevCrossRef.current = detectedCross;
+                          setCross(detectedCross);
+                        }
+                      }
+                    }
+                  } else {
+                    candidateConfirmedRef.current = null;
+                    candidateCountRef.current = 0;
                   }
                   lastProcessedCloseRef.current = k[6];
                   // polling provides closed-candle prices, so update authoritative lastPrice
