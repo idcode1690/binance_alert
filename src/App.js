@@ -117,7 +117,7 @@ function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     fetchExchangeInfo();
-  }, [showToast]);
+  }, []);
 
 
 
@@ -257,7 +257,7 @@ function App() {
         } catch (e) {}
       })();
     } catch (e) {}
-  }, []);
+  }, [showToast]);
 
   // quick setter for serverUrl via prompt, stored in localStorage
   // Removed promptSetServerUrl (Controls component provides Set Server URL)
