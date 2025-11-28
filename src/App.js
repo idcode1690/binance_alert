@@ -682,102 +682,109 @@ function App() {
 
   return (
     <div className={`App ${darkMode ? 'dark' : ''}`}>
-  <TopMenu onNavigate={setView} view={view} darkMode={darkMode} toggleDark={toggleDark} />
+      <TopMenu onNavigate={setView} view={view} darkMode={darkMode} toggleDark={toggleDark} />
       <div className="container">
-  <div className={`card ${view === 'alerts' ? 'view-alerts' : ''}`}>
-              {view === 'scanner' ? (
+        {view === 'scanner' ? (
+          <div className="card scanner-full">
             <ScannerPage availableSymbols={availableSymbols} fetchExchangeInfo={fetchExchangeInfo} monitorMinutes={monitorMinutes} setMonitorMinutes={setMonitorMinutes} monitorEma1={monitorEma1} setMonitorEma1={setMonitorEma1} monitorEma2={monitorEma2} setMonitorEma2={setMonitorEma2} />
-          ) : (
-            <>
-              <Header />
-              {/* inline toast for quick feedback */}
-              {toast && (
-                <div className={`toast ${toast.ok ? 'toast-ok' : 'toast-err'}`} role="status" aria-live="polite">
-                  <div className="toast-title">{toast.ok ? 'Success' : 'Error'}</div>
-                  <div className="toast-body">{toast.message}</div>
+          </div>
+        ) : (
+          <div className="layout-grid">
+            <aside className="sidebar">
+              <div className="card sidebar-card">
+                <Controls
+                  symbol={symbol}
+                  setSymbol={setSymbol}
+                  symbolValid={symbolValid}
+                  setSymbolValid={setSymbolValid}
+                  suggestions={suggestions}
+                  setSuggestions={setSuggestions}
+                  availableSymbols={availableSymbols}
+                  validateSymbolOnce={validateSymbolOnce}
+                  connect={setServerAndConnect}
+                  disconnect={disconnect}
+                  status={status}
+                  connected={connected}
+                  monitorMinutes={monitorMinutes}
+                  setMonitorMinutes={setMonitorMinutes}
+                  monitorEma1={monitorEma1}
+                  setMonitorEma1={setMonitorEma1}
+                  monitorEma2={monitorEma2}
+                  setMonitorEma2={setMonitorEma2}
+                  monitorConfirm={monitorConfirm}
+                  setMonitorConfirm={setMonitorConfirm}
+                  serverUrl={serverUrl}
+                  showToast={showToast}
+                />
+                <div style={{ marginTop: 12 }}>
+                  <Metrics activeSymbol={activeSymbol} symbol={symbol} lastPrice={lastPrice} lastTick={lastTick} lastCandleClosed={lastCandleClosed} cross={cross} confirmedCross={confirmedCross} ema9={ema9} ema26={ema26} monitorEma1={monitorEma1} monitorEma2={monitorEma2} />
                 </div>
-              )}
-
-              <Controls
-                symbol={symbol}
-                setSymbol={setSymbol}
-                
-                symbolValid={symbolValid}
-                setSymbolValid={setSymbolValid}
-                suggestions={suggestions}
-                setSuggestions={setSuggestions}
-                availableSymbols={availableSymbols}
-                validateSymbolOnce={validateSymbolOnce}
-                connect={setServerAndConnect}
-                disconnect={disconnect}
-                status={status}
-                connected={connected}
-                // monitoring inputs
-                monitorMinutes={monitorMinutes}
-                setMonitorMinutes={setMonitorMinutes}
-                monitorEma1={monitorEma1}
-                setMonitorEma1={setMonitorEma1}
-                monitorEma2={monitorEma2}
-                setMonitorEma2={setMonitorEma2}
-                monitorConfirm={monitorConfirm}
-                setMonitorConfirm={setMonitorConfirm}
-                // pass serverUrl and toast helper so Controls can manage runtime server setting
-                serverUrl={serverUrl}
-                showToast={showToast}
-              />
-              {/* 간단한 로딩 표시: 심볼 변경으로 상태가 reloading일 때 보임 */}
-              {status === 'reloading' && (
-                <div className="loading-text">초기화 중... 잠시만 기다려주세요</div>
-              )}
-              {symbolValid === false && (
-                <div className="invalid-msg">
-                  Invalid symbol — please check the trading pair (e.g. BTCUSDT)
-                  {suggestions && suggestions.length > 0 && (
-                    <div className="suggestions-wrap">
-                      <div className="suggestions-title">Did you mean:</div>
-                      <div className="suggestions-list">
-                        {suggestions.map((s) => (
-                          <button key={s} className="suggestion-btn" onClick={() => {
-                            setSymbol(s);
-                            setSymbolValid(true);
-                            setSuggestions([]);
-                            try { if (autoStart) setServerAndConnect(s); } catch (e) {}
-                          }}>{s}</button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                <div style={{ marginTop: 12 }}>
+                  <Notes>Notes: This app uses Binance public REST + websocket. Make sure network allows wss access to stream.binance.com.</Notes>
                 </div>
-              )}
-
-              {view === 'debug' ? (
-                <DebugPanel availableSymbols={availableSymbols} fetchExchangeInfo={fetchExchangeInfo} showDebug={showDebug} setMarketCheckResult={setMarketCheckResult} marketCheckResult={marketCheckResult} symbol={symbol} onSimulateAlert={simulateConfirmedCross} />
-              ) : null}
-
-              <div className="status">
-                Status: <strong>{status}</strong> {connected ? <span className="status-connected">(connected)</span> : <span className="status-disconnected">(disconnected)</span>}
               </div>
+            </aside>
+            <main className="main-area">
+              <div className="card main-card">
+                <Header />
+                {/* inline toast for quick feedback */}
+                {toast && (
+                  <div className={`toast ${toast.ok ? 'toast-ok' : 'toast-err'}`} role="status" aria-live="polite">
+                    <div className="toast-title">{toast.ok ? 'Success' : 'Error'}</div>
+                    <div className="toast-body">{toast.message}</div>
+                  </div>
+                )}
 
-              <Metrics activeSymbol={activeSymbol} symbol={symbol} lastPrice={lastPrice} lastTick={lastTick} lastCandleClosed={lastCandleClosed} cross={cross} confirmedCross={confirmedCross} ema9={ema9} ema26={ema26} monitorEma1={monitorEma1} monitorEma2={monitorEma2} />
+                {/* 간단한 로딩 표시: 심볼 변경으로 상태가 reloading일 때 보임 */}
+                {status === 'reloading' && (
+                  <div className="loading-text">초기화 중... 잠시만 기다려주세요</div>
+                )}
+                {symbolValid === false && (
+                  <div className="invalid-msg">
+                    Invalid symbol — please check the trading pair (e.g. BTCUSDT)
+                    {suggestions && suggestions.length > 0 && (
+                      <div className="suggestions-wrap">
+                        <div className="suggestions-title">Did you mean:</div>
+                        <div className="suggestions-list">
+                          {suggestions.map((s) => (
+                            <button key={s} className="suggestion-btn" onClick={() => {
+                              setSymbol(s);
+                              setSymbolValid(true);
+                              setSuggestions([]);
+                              try { if (autoStart) setServerAndConnect(s); } catch (e) {}
+                            }}>{s}</button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
 
-              <Alerts
-                events={events}
-                removeAlertByTs={removeAlertByTs}
-                symbol={symbol}
-                symbolValid={symbolValid}
-                status={status}
-                connect={setServerAndConnect}
-                disconnect={disconnect}
-                monitorMinutes={monitorMinutes}
-                monitorEma1={monitorEma1}
-                monitorEma2={monitorEma2}
-                monitorConfirm={monitorConfirm}
-              />
+                {view === 'debug' ? (
+                  <DebugPanel availableSymbols={availableSymbols} fetchExchangeInfo={fetchExchangeInfo} showDebug={showDebug} setMarketCheckResult={setMarketCheckResult} marketCheckResult={marketCheckResult} symbol={symbol} onSimulateAlert={simulateConfirmedCross} />
+                ) : null}
 
-              <Notes>Notes: This app uses Binance public REST + websocket. Make sure network allows wss access to stream.binance.com.</Notes>
-            </>
-          )}
-        </div>
+                <div className="status">
+                  Status: <strong>{status}</strong> {connected ? <span className="status-connected">(connected)</span> : <span className="status-disconnected">(disconnected)</span>}
+                </div>
+
+                <Alerts
+                  events={events}
+                  removeAlertByTs={removeAlertByTs}
+                  symbol={symbol}
+                  symbolValid={symbolValid}
+                  status={status}
+                  connect={setServerAndConnect}
+                  disconnect={disconnect}
+                  monitorMinutes={monitorMinutes}
+                  monitorEma1={monitorEma1}
+                  monitorEma2={monitorEma2}
+                  monitorConfirm={monitorConfirm}
+                />
+              </div>
+            </main>
+          </div>
+        )}
       </div>
     </div>
   );

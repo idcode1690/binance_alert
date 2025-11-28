@@ -53,14 +53,29 @@
 
 .container {
   width: 100%;
-  max-width: 760px;
+  max-width: 1200px;
   padding: 12px 20px 20px 20px;
   /* small gap between fixed menu and card */
   padding-top: 8px;
+  display: block;
+}
+
+/* Layout grid: sidebar + main area */
+.layout-grid {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 18px;
+  align-items: start;
+}
+.sidebar {
   display: flex;
   flex-direction: column;
-  justify-content: flex-start;
+  gap: 12px;
 }
+.sidebar-card { padding: 12px; }
+.main-area { display: block; }
+.main-card { padding: 16px; }
+.scanner-full { width: 100%; }
 
 .card {
   background: var(--card-bg);
@@ -737,6 +752,11 @@ button.secondary {
 @media (max-width: 600px) {
   .container { padding: 10px 12px 18px 12px; }
   .card { padding: 12px; }
+
+  /* make layout-grid stack on small screens */
+  .layout-grid { grid-template-columns: 1fr; gap: 10px; }
+  .sidebar { order: 2; }
+  .main-area { order: 1; }
 
   /* Stack scanner inputs and controls vertically for narrow screens */
   .scanner-panel {
