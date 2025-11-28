@@ -249,7 +249,7 @@ export default function ScannerPage({ availableSymbols, fetchExchangeInfo, monit
         try { beep(); } catch (e) {}
       }
     } catch (e) {}
-  }, [results]);
+  }, [results, state.active]);
 
   function formatVolume(v) {
     try {

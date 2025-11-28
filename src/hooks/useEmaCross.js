@@ -270,7 +270,7 @@ export default function useEmaCross({ symbol = 'BTCUSDT', autoConnect = true, de
             // EMAs and the newly computed confirmed EMAs. A cross is defined as a
             // sign change: prevShort <= prevLong && newShort > newLong => golden
             // prevShort >= prevLong && newShort < newLong => dead
-            let detectedCross = null;
+            detectedCross = null;
             try {
               if (prevShort != null && prevLong != null) {
                 if (prevShort <= prevLong && newEma9c > newEma26c) detectedCross = 'bull';

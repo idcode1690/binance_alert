@@ -117,7 +117,7 @@ function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     fetchExchangeInfo();
-  }, []);
+  }, [showToast]);
 
 
 
@@ -330,7 +330,7 @@ function App() {
       }
     }, 200);
     return () => { try { ctrl.abort(); } catch (e) {} clearTimeout(t); };
-  }, [serverUrl, monitorMinutes, monitorEma1, monitorEma2]);
+  }, [serverUrl, monitorMinutes, monitorEma1, monitorEma2, showToast]);
 
   // Debug helper: simulate a confirmed cross from the frontend (calls /send-alert and adds local event)
   const simulateConfirmedCross = React.useCallback((forceType) => {

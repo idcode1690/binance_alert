@@ -311,7 +311,7 @@ const scannerManager = (() => {
   function clearResults() { results = []; notifyThrottled(true); }
   function removeActive(symbol) { if (!symbol) return; if (activeMatches[symbol]) { delete activeMatches[symbol]; notifyThrottled(true); } }
 
-  return { onUpdate, setGetSymbols, start, stop, getState, removeResult, clearResults };
+  return { onUpdate, setGetSymbols, start, stop, getState, removeResult, clearResults, removeActive };
 })();
 
 export default scannerManager;
