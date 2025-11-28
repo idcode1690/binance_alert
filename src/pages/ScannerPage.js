@@ -113,8 +113,8 @@ export default function ScannerPage({ availableSymbols, fetchExchangeInfo, monit
         interval: intervalVal,
         emaShort: Number.isFinite(ema1) && ema1 > 0 ? ema1 : monitorEma1,
         emaLong: Number.isFinite(ema2) && ema2 > 0 ? ema2 : monitorEma2,
-        // explicitly request 200 candles for scanning to ensure stable EMA seeding
-        klineLimit: 200,
+        // explicitly request 400 candles for scanning to ensure stable EMA seeding
+        klineLimit: 400,
         // real-time monitoring mode
         monitor: true,
         pollIntervalMs: (Number.isFinite(intervalVal) ? (intervalVal * 60 * 1000 + 5000) : undefined),
@@ -147,8 +147,8 @@ export default function ScannerPage({ availableSymbols, fetchExchangeInfo, monit
         interval: intervalVal2,
         emaShort: Number.isFinite(ema1) && ema1 > 0 ? ema1 : monitorEma1,
         emaLong: Number.isFinite(ema2) && ema2 > 0 ? ema2 : monitorEma2,
-        // explicitly request 200 candles for scanning to ensure stable EMA seeding
-        klineLimit: 200,
+        // explicitly request 400 candles for scanning to ensure stable EMA seeding
+        klineLimit: 400,
         monitor: true,
         pollIntervalMs: (Number.isFinite(intervalVal2) ? (intervalVal2 * 60 * 1000 + 5000) : undefined),
         concurrency: 2,
