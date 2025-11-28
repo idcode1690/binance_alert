@@ -269,7 +269,7 @@ export default function ScannerPage({ availableSymbols, fetchExchangeInfo, monit
   <div className="panel scanner-panel">
         <div className="scanner-controls-left">
           <label className="control-inline-label">
-            <span className="label-text">Mins</span>
+            <span className="label-text">Mins (candle interval)</span>
             <input type="text" inputMode="numeric" pattern="\d*" value={minsStr} onChange={(e) => setMinsStr(e.target.value)} onBlur={() => {
               const p = parseInt(minsStr, 10);
               if (Number.isFinite(p) && p > 0) saveScannerDefaults(p, parseInt(ema1Str, 10) || '', parseInt(ema2Str, 10) || '');

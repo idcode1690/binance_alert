@@ -102,7 +102,7 @@ export default function Controls(props) {
       </label>
 
       <label className="control-inline-label" style={{marginLeft:8}}>
-        <span className="label-text">Mins</span>
+        <span className="label-text">Mins (candle interval)</span>
         <input type="number" min="1" value={minsStr} onChange={(e) => { setMinsStr(e.target.value); }} onBlur={() => {
           // commit only on blur: avoid forcing 0 while typing
           const p = parseInt(minsStr, 10);
