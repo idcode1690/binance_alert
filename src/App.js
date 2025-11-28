@@ -390,6 +390,27 @@ function App() {
       try { connect(sym); } catch (e) {}
       return;
     }
+    // If caller passed monitoring overrides, commit them to parent state so the
+    // `useEmaCross` hook receives updated props on next render. We wait a short
+    // moment to allow React to flush state before calling `connect` which relies
+    // on the hook's `interval`/`emaShort`/`emaLong` values.
+    try {
+      if (opts) {
+        try {
+          if (typeof opts.interval !== 'undefined') {
+            let v = opts.interval;
+            if (typeof v === 'string' && v.endsWith('m')) v = Number(v.replace(/m$/, ''));
+            if (typeof v === 'number' && Number.isFinite(v) && v > 0) setMonitorMinutes(Number(v));
+          }
+        } catch (e) {}
+        try { if (typeof opts.emaShort !== 'undefined' && Number.isFinite(Number(opts.emaShort))) setMonitorEma1(Number(opts.emaShort)); } catch (e) {}
+        try { if (typeof opts.emaLong !== 'undefined' && Number.isFinite(Number(opts.emaLong))) setMonitorEma2(Number(opts.emaLong)); } catch (e) {}
+      }
+    } catch (e) {}
+
+    // allow React to re-render with new monitor values before connecting
+    try { await new Promise((r) => setTimeout(r, 120)); } catch (e) {}
+
     try { connect(q); } catch (e) {}
     // persist the last-used monitor inputs so Alerts/Controls can restore them
     try {
