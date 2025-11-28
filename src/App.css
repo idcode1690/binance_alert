@@ -164,6 +164,24 @@ button {
   cursor: pointer;
 }
 
+/* Interval buttons (small) */
+.small-interval-btn {
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--input-border);
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+}
+.small-interval-btn:hover { background: rgba(0,0,0,0.04); }
+.App.dark .small-interval-btn:hover { background: rgba(255,255,255,0.03); }
+.small-interval-btn.active {
+  background: var(--button-bg);
+  color: var(--button-text);
+  border-color: transparent;
+}
+
 button.secondary {
   background: var(--scanner-stop);
   color: var(--button-text);
