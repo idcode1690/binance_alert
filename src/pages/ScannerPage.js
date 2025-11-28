@@ -268,13 +268,18 @@ export default function ScannerPage({ availableSymbols, fetchExchangeInfo, monit
       <div className="alerts-title">Binance EMA Cross Scanner</div>
   <div className="panel scanner-panel">
         <div className="scanner-controls-left">
-          <label className="control-inline-label">
+          <div className="control-inline-label">
             <span className="label-text">Mins (candle interval)</span>
-            <input type="text" inputMode="numeric" pattern="\d*" value={minsStr} onChange={(e) => setMinsStr(e.target.value)} onBlur={() => {
-              const p = parseInt(minsStr, 10);
-              if (Number.isFinite(p) && p > 0) saveScannerDefaults(p, parseInt(ema1Str, 10) || '', parseInt(ema2Str, 10) || '');
-            }} />
-          </label>
+            <div className="interval-btns" style={{ display: 'inline-flex', gap: 6, marginLeft: 8 }}>
+              {[{ label: '1m', val: '1' }, { label: '5m', val: '5' }, { label: '30m', val: '30' }, { label: '4h', val: '240' }].map((it) => (
+                <button key={it.val} type="button" className={`small-interval-btn ${String(minsStr) === String(it.val) ? 'active' : ''}`} onClick={() => {
+                  setMinsStr(String(it.val));
+                  const p = parseInt(it.val, 10);
+                  if (Number.isFinite(p) && p > 0) saveScannerDefaults(p, parseInt(ema1Str, 10) || '', parseInt(ema2Str, 10) || '');
+                }}>{it.label}</button>
+              ))}
+            </div>
+          </div>
           <label className="control-inline-label">
             <span className="label-text">EMA1</span>
             <input type="text" inputMode="numeric" pattern="\d*" value={ema1Str} onChange={(e) => setEma1Str(e.target.value)} onBlur={() => {
