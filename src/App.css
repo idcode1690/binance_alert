@@ -164,22 +164,56 @@ button {
   cursor: pointer;
 }
 
-/* Interval buttons (small) */
+/* Interval button group container */
+.interval-btns {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+/* Interval buttons (small) - redesigned for clear active state */
 .small-interval-btn {
-  padding: 6px 8px;
-  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  padding: 6px 10px;
+  border-radius: 8px;
   border: 1px solid var(--input-border);
   background: transparent;
   color: var(--text);
   font-size: 13px;
   cursor: pointer;
+  transition: background-color 140ms ease, color 140ms ease, box-shadow 140ms ease, transform 120ms ease;
 }
-.small-interval-btn:hover { background: rgba(0,0,0,0.04); }
+.small-interval-btn:hover {
+  background: rgba(0,0,0,0.04);
+  transform: translateY(-1px);
+}
 .App.dark .small-interval-btn:hover { background: rgba(255,255,255,0.03); }
+
+/* focus/keyboard visible state */
+.small-interval-btn:focus {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(59,130,246,0.12);
+}
+
+/* active/selected state */
 .small-interval-btn.active {
+  background: linear-gradient(90deg, var(--scanner-green), #10b981);
+  color: white;
+  border-color: transparent;
+  box-shadow: 0 6px 18px rgba(16,185,129,0.14);
+}
+.App.dark .small-interval-btn.active {
+  background: linear-gradient(90deg, #059669, #10b981);
+  color: white;
+}
+
+/* allow a variant to explicitly style a neutral active state if needed */
+.small-interval-btn.active.neutral {
   background: var(--button-bg);
   color: var(--button-text);
-  border-color: transparent;
 }
 
 button.secondary {
