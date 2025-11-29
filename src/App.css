@@ -53,7 +53,7 @@
 
 .container {
   width: 100%;
-  max-width: 910px;
+  max-width: 860px;
   padding: 12px 20px 20px 20px;
   /* small gap between fixed menu and card */
   padding-top: 8px;
@@ -90,12 +90,11 @@
 .card.scanner-full,
 .card.main-card {
   width: 100%;
-  max-width: 870px; /* keep both cards the same max width (increased by 50px) */
+  max-width: 820px; /* keep both cards the same max width */
   margin-left: auto;
   margin-right: auto;
   box-sizing: border-box;
 }
-/* header */
 .header {
   display: flex;
   align-items: center;
@@ -164,7 +163,7 @@ input[type="text"] {
 
 /* allow the symbol input to shrink before numeric inputs collapse */
 .controls .controls-label { flex: 0 1 auto; }
-.controls .controls-label input[type="text"] {
+.controls .controls-label input[type="text"] { 
   flex: 0 1 80px;
   min-width: 64px;
   max-width: 140px;

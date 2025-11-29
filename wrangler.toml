@@ -1,0 +1,9 @@
+# Root Wrangler config for Cloudflare Pages
+name = "binance-alert"
+compatibility_date = "2025-08-16"
+
+# Required for Cloudflare Pages build system (v2 root strategy)
+pages_build_output_dir = "build"
+
+# Add a compatibility flag to bust any cached config and ensure Pages reads this file
+compatibility_flags = ["nodejs_compat"]
