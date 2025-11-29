@@ -1,0 +1,847 @@
+.App {
+  font-family: Inter, Roboto, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial;
+  /* subtract the fixed top menu height so we don't create an extra page scrollbar
+     when the content height fits within the viewport. The top menu is fixed and
+     visually overlays the page, so reserve the same space but keep total <= 100vh */
+  min-height: calc(100vh - 64px);
+  display: flex;
+  /* position content toward the top so the card sits just below the fixed menu bar */
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 64px; /* reserve space for fixed top menu */
+  background: var(--bg, #f5f7fb);
+  color: var(--text, #0f172a);
+}
+
+:root {
+  /* light theme defaults */
+  --bg: #f5f7fb;
+  --card-bg: #ffffff;
+  --text: #0f172a;
+  --muted: #6b7280;
+  --panel-border: #e6e9ef;
+  --input-bg: #ffffff;
+  --input-border: #e6e9ef;
+  --card-shadow: 0 6px 18px rgba(15,23,42,0.08);
+  --button-bg: #0f172a;
+  --button-text: #ffffff;
+  --scanner-green: #059669;
+  --scanner-red: #dc2626;
+  --scanner-stop: #6b7280;
+  --panel-alt-bg: #f8fafc;
+  --muted-2: #334155;
+}
+
+.App.dark {
+  /* VSCode-like gray/black theme variables */
+  --bg: #1e1e23;
+  --card-bg: #151719;
+  --text: #cbd5e1;
+  --muted: #94a3b8;
+  --panel-border: rgba(255,255,255,0.04);
+  --input-bg: #0f1418;
+  --input-border: rgba(255,255,255,0.04);
+  --card-shadow: 0 8px 30px rgba(0,0,0,0.6);
+  --button-bg: #0b1220;
+  --button-text: #cbd5e1;
+  --scanner-green: #10b981;
+  --scanner-red: #f87171;
+  --scanner-stop: #374151;
+  --panel-alt-bg: #0d1114;
+  --muted-2: #94a3b8;
+}
+
+.container {
+  width: 100%;
+  max-width: 910px;
+  padding: 12px 20px 20px 20px;
+  /* small gap between fixed menu and card */
+  padding-top: 8px;
+  display: block;
+}
+
+/* Layout grid: sidebar + main area */
+.layout-grid {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  gap: 18px;
+  align-items: start;
+}
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sidebar-card { padding: 8px; }
+.main-area { display: block; }
+.scanner-full { width: 100%; }
+
+.card {
+  background: var(--card-bg);
+  border-radius: 10px;
+  box-shadow: var(--card-shadow);
+  padding: 8px;
+  border: 1px solid var(--panel-border);
+}
+
+.main-card { padding: 8px; }
+
+/* Ensure Alerts main-card and Scanner full card share identical width and centering */
+.card.scanner-full,
+.card.main-card {
+  width: 100%;
+  max-width: 870px; /* keep both cards the same max width (increased by 50px) */
+  margin-left: auto;
+  margin-right: auto;
+  box-sizing: border-box;
+}
+.header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.title {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+/* Make scanner/alerts titles match the main header title style */
+.alerts-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.controls {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  margin-top: 6px;
+  /* prefer single-line controls; shrink inputs if needed */
+  flex-wrap: nowrap;
+  align-items: center;
+}
+
+.view-alerts .controls input[type="text"],
+.view-alerts .controls input[type="number"],
+.view-alerts .controls .label-text {
+  font-family: 'Noto Sans KR', Inter, Roboto, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, 'Noto Sans';
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+}
+.view-alerts .controls .label-text { font-size: 11px; color: var(--muted); }
+
+
+input[type="text"] {
+  padding: 6px 8px;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  color: var(--text);
+  border-radius: 6px;
+  min-width: 80px;
+  max-width: 160px;
+  box-sizing: border-box;
+}
+
+/* Make numeric monitoring inputs visually match the symbol input and constrain width */
+.controls input[type="number"],
+.controls-label input[type="number"],
+.control-inline-label input[type="number"] {
+  padding: 4px 6px;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  color: var(--text);
+  border-radius: 6px;
+  min-width: 36px;
+  max-width: 64px;
+  box-sizing: border-box;
+  font-size: 13px;
+}
+
+/* allow the symbol input to shrink before numeric inputs collapse */
+.controls .controls-label { flex: 0 1 auto; }
+.controls .controls-label input[type="text"] { 
+  flex: 0 1 80px;
+  min-width: 64px;
+  max-width: 140px;
+  /* match numeric inputs so visual weight is identical */
+  padding: 4px 6px;
+  font-size: 13px;
+  box-sizing: border-box;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  color: var(--text);
+  border-radius: 6px;
+}
+
+/* slightly smaller buttons in controls area to save space */
+.controls > button { padding: 6px 10px; }
+
+button {
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: none;
+  background: var(--button-bg);
+  color: var(--button-text);
+  cursor: pointer;
+}
+
+/* Interval button group container */
+.interval-btns {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+/* Interval buttons (small) - redesigned for clear active state */
+.small-interval-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* slightly smaller interval buttons to avoid wrapping */
+  min-width: 28px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--input-border);
+  background: transparent;
+  color: var(--text);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background-color 140ms ease, color 140ms ease, box-shadow 140ms ease, transform 120ms ease;
+}
+.small-interval-btn:hover {
+  background: rgba(0,0,0,0.04);
+  transform: translateY(-1px);
+}
+.App.dark .small-interval-btn:hover { background: rgba(255,255,255,0.03); }
+
+/* focus/keyboard visible state */
+.small-interval-btn:focus {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(59,130,246,0.12);
+}
+
+/* active/selected state */
+.small-interval-btn.active {
+  background: linear-gradient(90deg, var(--scanner-green), #10b981);
+  color: white;
+  border-color: transparent;
+  box-shadow: 0 6px 18px rgba(16,185,129,0.14);
+}
+.App.dark .small-interval-btn.active {
+  background: linear-gradient(90deg, #059669, #10b981);
+  color: white;
+}
+
+/* allow a variant to explicitly style a neutral active state if needed */
+.small-interval-btn.active.neutral {
+  background: var(--button-bg);
+  color: var(--button-text);
+}
+
+button.secondary {
+  background: var(--scanner-stop);
+  color: var(--button-text);
+}
+
+.status {
+  margin-top: 12px;
+  font-size: 13px;
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.metric {
+  background: var(--panel-alt-bg);
+  padding: 10px;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.alerts {
+  margin-top: 14px;
+}
+
+/* Scanner page uses the same .alerts block at the very top of the card,
+   so remove the extra top margin there to balance top/bottom whitespace
+   and match the Alerts view visual rhythm. */
+.scanner-root.alerts {
+  margin-top: 0;
+}
+
+/* Make the scanner panel vertical padding match the Alerts controls feel */
+.scanner-panel {
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+.alerts ul {
+  list-style: none;
+  padding-left: 0;
+  margin-top: 8px;
+  /* allow the alerts list to grow with the page so the browser scrollbar is used
+     instead of an internal scroll. This keeps both Scanner and Alerts pages
+     consistent and avoids nested scrollbars when many items are present. */
+}
+
+.alerts ul li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px;
+  border-radius: 8px;
+  transition: background 120ms ease;
+}
+.alerts ul li:hover {
+  background: rgba(0,0,0,0.03);
+}
+
+/* ensure hover is visible in dark theme */
+.App.dark .alerts ul li:hover {
+  background: rgba(255,255,255,0.03);
+}
+
+/* Delete button for alerts: small compact square */
+.alerts .delete-btn {
+  padding: 0 !important;
+  width: 22px !important;
+  height: 22px !important;
+  font-size: 11px !important;
+  line-height: 1 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 6px !important;
+  background: transparent !important;
+  color: var(--muted-2) !important;
+  border: 1px solid var(--panel-border) !important;
+}
+
+/* Alerts list refactor styles */
+.alerts-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.alert-item {
+  padding: 8px 6px;
+  /* use themed panel border so dark mode shows a subtle line */
+  border-bottom: 1px solid var(--panel-border);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: nowrap; /* prevent vertical wrapping inside each alert row */
+  min-width: 0; /* allow children to shrink and respect ellipsis */
+}
+.alert-left {
+  /* left column: slightly wider to avoid truncating symbol names */
+  flex: 0 0 110px; /* fixed column width for predictable layout */
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 72px;
+  max-width: 140px;
+}
+
+/* Price number alignment: use tabular numbers and fixed min-widths so decimals align */
+.alert-price {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+  .alert-price .price-num {
+  min-width: 56px; /* reduced width to avoid wrapping */
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+  -moz-font-feature-settings: "tnum" 1;
+  -webkit-font-feature-settings: "tnum" 1;
+}
+.alert-price .price-sep {
+  color: var(--muted);
+  font-weight: 600;
+}
+.alert-indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 6px;
+  display: inline-block;
+}
+.alert-indicator.bull { background: #10b981; }
+.alert-indicator.bear { background: #ef4444; }
+.alert-symbol {
+  font-size: 12px;
+  color: var(--text);
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 110px; /* increased so full symbol is visible on Scanner */
+}
+
+/* clickable symbol button styles (used in scanner results) */
+.alert-left .copy-btn {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font-size: 12px;
+  color: var(--text);
+  font-weight: 700;
+  cursor: pointer;
+}
+.alert-left .copy-btn:focus { outline: none; box-shadow: 0 0 0 3px rgba(16,185,129,0.12); border-radius: 4px; }
+.alert-left .copy-btn.copied {
+  color: var(--scanner-green);
+  transition: color 160ms ease;
+}
+.alert-body {
+  flex: 1 1 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  min-width: 0; /* allow children to shrink properly and enable ellipsis */
+}
+.alert-info {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.alert-info { min-width: 0; overflow: hidden; }
+.alert-type-short {
+  font-size: 13px;
+  color: var(--text);
+  font-weight: 600;
+  text-transform: capitalize;
+  flex: none;
+}
+.alert-time {
+  font-size: 12px;
+  color: var(--muted);
+  flex: none;
+}
+.alert-right {
+  /* right column: compact, allow contents to compress but not wrap lines */
+  flex: 0 0 72px; /* fixed column width to keep layout consistent */
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  white-space: nowrap; /* prevent wrapping to next line */
+  min-width: 48px;
+}
+.alert-price {
+  font-size: 13px;
+  font-weight: 700;
+  text-align: right;
+}
+.alert-volume {
+  /* smaller, English-friendly font for compact volume display */
+  font-size: 0.72rem; /* smaller than price */
+  color: var(--muted);
+  text-align: right;
+  line-height: 1;
+  margin-left: 6px;
+  opacity: 0.9;
+  white-space: nowrap;
+  font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', 'Segoe UI Emoji';
+  font-variant-numeric: tabular-nums; /* better alignment for numeric volumes */
+}
+/* small delete button for scanner results */
+.delete-result {
+  background: transparent;
+  border: 1px solid var(--panel-border);
+  color: var(--muted-2);
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 700;
+}
+.delete-result:hover { background: rgba(0,0,0,0.04); }
+
+/* header right small note */
+.header-right {
+  margin-left: auto;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+/* Top menu bar (outside the card) */
+.top-menu-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  padding: 10px 0;
+  background: var(--card-bg);
+  box-shadow: 0 2px 8px rgba(15,23,42,0.06);
+  z-index: 9999;
+}
+.top-menu-bar .menu-btn {
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted-2);
+  cursor: pointer;
+}
+.top-menu-bar .menu-btn:hover { background: rgba(0,0,0,0.03); }
+.top-menu-bar .menu-btn.active { background: var(--button-bg); color: var(--button-text); border-color: var(--button-bg); }
+
+.top-menu-bar .menu-btn.theme-toggle { padding: 8px 12px; font-weight: 700; border-radius: 10px; min-width: 96px; }
+.top-menu-bar .menu-btn.theme-toggle.active { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.04); }
+
+.loading-text {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.invalid-msg {
+  color: var(--scanner-red);
+  margin-top: 8px;
+}
+
+.suggestions-wrap {
+  margin-top: 8px;
+}
+.suggestions-title {
+  font-size: 13px;
+  margin-bottom: 6px;
+  color: var(--muted-2);
+}
+.suggestions-list {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.suggestion-btn {
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--panel-border);
+  background: var(--card-bg);
+  cursor: pointer;
+}
+
+.status-connected { color: var(--scanner-green); }
+.status-disconnected { color: var(--muted); }
+
+/* Metrics label */
+.metric-label { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+
+/* Controls classes */
+.controls-label { display: flex; align-items: center; gap: 8px; }
+.control-inline-label { margin-left: 12px; display: flex; align-items: center; gap: 8px; }
+.label-text { font-size: 13px; }
+
+/* Debug panel */
+.debug-panel { margin-top: 12px; padding: 10px; border: 1px dashed var(--panel-border); border-radius: 8px; background: var(--card-bg); }
+.debug-title { font-size: 13px; color: var(--muted-2); margin-bottom: 6px; }
+.debug-available { font-size: 13px; color: var(--muted); }
+.debug-block { margin-top: 8px; font-size: 13px; }
+.debug-actions { margin-top: 8px; display: flex; gap: 8px; }
+.small-btn { padding: 6px 8px; }
+.market-result { margin-top: 8px; font-size: 13px; color: var(--muted-2); }
+
+.alert-type {
+  display: inline-block;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: #fff;
+}
+.alert-type.bull {
+  background: linear-gradient(90deg, #059669, #10b981);
+}
+.alert-type.bear {
+  background: linear-gradient(90deg, #dc2626, #f97316);
+}
+
+/* Scanner buttons to match Binance colors and uniform sizing */
+.scanner-controls .scanner-btn {
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: none;
+  color: var(--button-text);
+  cursor: pointer;
+  min-width: 72px; /* reduced to avoid wrapping */
+  text-align: center;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+.scanner-controls .scanner-btn.green {
+  background: linear-gradient(90deg, #059669, #10b981);
+}
+.scanner-controls .scanner-btn.red {
+  background: linear-gradient(90deg, #dc2626, #ef4444);
+}
+.scanner-controls .scanner-btn.stop {
+  background: #6b7280; /* neutral gray for stop */
+}
+
+.scanner-controls input[type="number"] {
+  padding: 8px 10px;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  color: var(--text);
+  border-radius: 6px;
+}
+
+/* Scanner progress text: smaller, English-friendly system font for better readability */
+.scanner-progress-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+/* Keep scanner inputs and buttons on one line; prevent wrapping */
+.scanner-panel { margin: 8px 0; overflow-x: auto; flex-wrap: nowrap; }
+.scanner-controls-left {
+  display: flex;
+  gap: 6px; /* reduced gap between label+input pairs */
+  align-items: center;
+  flex: 1 1 auto;
+  min-width: 0; /* allow shrink */
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+
+/* Remove extra left margin for inline labels inside the scanner panel so items align flush */
+.scanner-panel .control-inline-label { margin-left: 0; }
+
+/* Ensure scanner-controls container aligns buttons horizontally and doesn't wrap */
+.scanner-controls {
+  display: flex;
+  flex-direction: row;
+  gap: 6px;
+  align-items: center;
+  justify-content: flex-end;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+/* Make numeric inputs slightly smaller so they fit better on narrow screens */
+.scanner-controls-left input[type="number"] {
+  /* slightly narrower numeric inputs to save horizontal space */
+  min-width: 28px;
+  max-width: 40px;
+  padding: 4px 6px;
+  font-size: 12px;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  color: var(--text);
+  border-radius: 6px;
+}
+
+/* Shared small EMA input used on Scanner and Alerts/Controls pages */
+.ema-input {
+  width: 5ch !important;
+  min-width: 5ch !important;
+  max-width: 5ch !important;
+  padding: 4px 6px !important;
+  box-sizing: border-box !important;
+  font-size: 13px !important;
+  background: var(--input-bg) !important;
+  border: 1px solid var(--input-border) !important;
+  color: var(--text) !important;
+  border-radius: 6px !important;
+}
+.scanner-progress-left {
+  font-family: -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-size: 0.75rem;
+  color: var(--text);
+  letter-spacing: 0.2px;
+}
+.scanner-progress-right {
+  font-family: -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-size: 0.75rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums; /* improves alignment of numbers */
+}
+/* small elapsed time label shown before progress numbers */
+.scanner-elapsed {
+  color: var(--muted-2);
+  margin-right: 8px;
+  font-weight: 600;
+  font-size: 0.78rem;
+}
+.scanner-progress-numbers { color: var(--muted); }
+
+.alerts .alert-price {
+  font-weight: 700;
+  color: var(--text);
+}
+.alerts .alert-time {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.note {
+  margin-top: 12px;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.badge {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  color: white;
+  line-height: 1;
+  vertical-align: middle;
+}
+.badge.closed {
+  background: var(--scanner-green); /* green */
+}
+.badge.open {
+  background: var(--scanner-stop); /* gray */
+}
+
+/* LIVE badge colors based on daily candle direction */
+.badge.open.live-bull {
+  background: linear-gradient(90deg, #059669, #10b981); /* green */
+}
+.badge.open.live-bear {
+  background: linear-gradient(90deg, #dc2626, #f97316); /* red/orange */
+}
+
+/* Generic panel used for scanner/alerts inputs so theme colors apply */
+.panel {
+  border: 1px solid var(--panel-border);
+  background: var(--panel-alt-bg);
+  /* unified padding so Scanner and Alerts panels match visually */
+  padding: 8px 8px;
+  border-radius: 8px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.scanner-panel { margin: 6px 0; overflow-x: auto; flex-wrap: nowrap; align-items: center; gap: 6px; padding-top: 8px; padding-bottom: 8px; }
+
+/* modal overlay and card */
+.modal-overlay {
+  position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 15000;
+  background: rgba(0,0,0,0.45);
+}
+.modal-card {
+  background: var(--card-bg);
+  color: var(--text);
+  padding: 20px;
+  border-radius: 8px;
+  width: 420px;
+  max-width: 90%;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.25);
+}
+.modal-title { font-size: 1.1rem; font-weight: 700; margin-bottom: 8px; }
+.modal-sub { font-size: 0.95rem; color: var(--text); margin-bottom: 12px; }
+.modal-time { font-size: 0.85rem; color: var(--muted); margin-bottom: 16px; }
+
+/* progress track and fill */
+.progress-wrap { width: 100%; margin: 8px 0; }
+.progress-track { background: var(--panel-border); height: 10px; border-radius: 6px; overflow: hidden; }
+.progress-fill { height: 100%; background: var(--muted); transition: width 300ms ease, background-color 200ms ease; }
+/* color variants: golden (green) and dead (red) to match scanner buttons */
+.progress-fill.golden { background: linear-gradient(90deg, var(--scanner-green), #10b981); }
+.progress-fill.dead { background: linear-gradient(90deg, var(--scanner-red), #ef4444); }
+
+/* monitor badge used in alerts header */
+.monitor-badge { font-size: 0.8rem; color: var(--muted-2); background: transparent; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--panel-border); }
+
+/* toast */
+.toast { position: absolute; top: 12px; right: 12px; padding: 8px 12px; border-radius: 6px; z-index: 20000; box-shadow: 0 2px 8px rgba(0,0,0,0.3); color: var(--button-text); }
+.toast.toast-ok { background: rgba(16,185,129,0.9); }
+.toast.toast-err { background: rgba(239,68,68,0.95); }
+.toast-title { font-size: 0.9rem; font-weight: 600; }
+.toast-body { font-size: 0.8rem; margin-top: 4px; }
+
+.no-results { color: var(--muted); }
+
+.alert-source { font-size: 0.7rem; color: var(--muted); margin-top: 4px; }
+
+/* Mobile-friendly adjustments for Scanner and Alerts */
+@media (max-width: 600px) {
+  .container { padding: 10px 12px 18px 12px; }
+  .card { padding: 12px; }
+
+  /* make layout-grid stack on small screens */
+  .layout-grid { grid-template-columns: 1fr; gap: 10px; }
+  .sidebar { order: 2; }
+  .main-area { order: 1; }
+
+  /* Stack scanner inputs and controls vertically for narrow screens */
+  .scanner-panel {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    padding: 6px;
+  }
+
+  .scanner-controls-left {
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
+    align-items: center;
+    justify-content: flex-start;
+    overflow-x: auto;
+  }
+
+  /* Make numeric inputs easier to tap on mobile */
+  .scanner-controls-left input[type="number"],
+  .scanner-panel input[type="number"] {
+    min-width: 56px;
+    max-width: 84px;
+    padding: 8px 10px;
+    font-size: 14px;
+  }
+
+  /* Buttons become full-width or expand evenly on small screens */
+  .scanner-controls {
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
+    width: 100%;
+    justify-content: space-between;
+  }
+  .scanner-controls .scanner-btn {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 0.95rem;
+    padding: 10px 8px;
+  }
+
+  /* Progress and status text slightly larger and wrap-friendly */
+  .scanner-progress-container { font-size: 0.85rem; }
+
+  /* Alerts list: reduce left column, allow wrapping and smaller right column */
+  .alert-item { padding: 8px 6px; }
+  .alert-left { min-width: 80px; max-width: 120px; }
+  .alert-right { flex: 0 0 90px; }
+
+  /* Reduce visual padding inside generic panels */
+  .panel { padding: 8px; }
+
+  /* Ensure toast is reachable on small screens */
+  .toast { right: 8px; left: 8px; top: 12px; }
+}
