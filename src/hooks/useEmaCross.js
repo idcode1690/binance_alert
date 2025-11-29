@@ -78,9 +78,6 @@ export default function useEmaCross({ symbol = 'BTCUSDT', autoConnect = true, de
       return s;
     } catch (e) { return String(raw); }
   };
-
-  const getBinanceInterval = () => normalizeIntervalForBinance(interval);
-
   const fetchAndInit = useCallback(async (target = symbol) => {
     try {
       const t = (target || symbol).toString();
@@ -88,7 +85,7 @@ export default function useEmaCross({ symbol = 'BTCUSDT', autoConnect = true, de
       const norm = t.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
   // use Binance Futures (USDT-M) REST endpoint for klines; interval is configurable
   // normalize interval to Binance-accepted token (e.g., convert '240m' -> '4h')
-  const bi = getBinanceInterval();
+  const bi = normalizeIntervalForBinance(interval);
   // request up to 1000 candles to provide long historical context for EMA calculations
   const url = `https://fapi.binance.com/fapi/v1/klines?symbol=${norm}&interval=${bi}&limit=1000`;
     const res = await fetch(url);
@@ -159,7 +156,8 @@ export default function useEmaCross({ symbol = 'BTCUSDT', autoConnect = true, de
 
     setStatus('connecting websocket');
     // Use combined stream: kline interval (configurable) + aggTrade for higher-frequency trade updates
-    const klineStream = `${targetNorm.toLowerCase()}@kline_${getBinanceInterval()}`;
+    const biLocal = normalizeIntervalForBinance(interval);
+    const klineStream = `${targetNorm.toLowerCase()}@kline_${biLocal}`;
   const tradeStream = `${targetNorm.toLowerCase()}@aggTrade`;
     const streams = `${klineStream}/${tradeStream}`;
   // use Binance Futures (USDT-M) websocket (fstream) combined stream
@@ -420,7 +418,7 @@ export default function useEmaCross({ symbol = 'BTCUSDT', autoConnect = true, de
             try {
               const sym = (reconnectTarget || symbol || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
               if (!sym) return;
-                  const url = `https://fapi.binance.com/fapi/v1/klines?symbol=${sym}&interval=${getBinanceInterval()}&limit=10`;
+                  const url = `https://fapi.binance.com/fapi/v1/klines?symbol=${sym}&interval=${normalizeIntervalForBinance(interval)}&limit=10`;
               const res = await fetch(url);
               if (!res.ok) return;
               const data = await res.json();
