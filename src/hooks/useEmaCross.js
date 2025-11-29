@@ -47,13 +47,50 @@ export default function useEmaCross({ symbol = 'BTCUSDT', autoConnect = true, de
   const lastProcessedCloseRef = useRef(null); // timestamp (ms) of last processed closed candle
   const pollingTimerRef = useRef(null);
 
+  // Normalize interval strings for Binance API compatibility.
+  // Binance accepts tokens like '1m','3m','5m','15m','30m','1h','2h','4h', etc.
+  // The app sometimes passes numeric minute strings like '240m' or '240';
+  // convert minute multiples of 60 to '4h' style tokens so REST requests don't 400.
+  const normalizeIntervalForBinance = (raw) => {
+    try {
+      let s = String(raw || '').trim();
+      if (!s) return s;
+      s = s.toLowerCase();
+      const allowed = new Set(['1m','3m','5m','15m','30m','1h','2h','4h','6h','8h','12h','1d','3d','1w','1m']);
+      if (allowed.has(s)) return s;
+      // plain number like '240' -> minutes
+      const numMatch = s.match(/^([0-9]+)$/);
+      if (numMatch) {
+        const n = Number(numMatch[1]);
+        if (n % 60 === 0) return `${n/60}h`;
+        return `${n}m`;
+      }
+      // matches like '240m'
+      const mMatch = s.match(/^([0-9]+)m$/);
+      if (mMatch) {
+        const n = Number(mMatch[1]);
+        if (n % 60 === 0) return `${n/60}h`;
+        return `${n}m`;
+      }
+      // matches like '4h'
+      const hMatch = s.match(/^([0-9]+)h$/);
+      if (hMatch) return `${Number(hMatch[1])}h`;
+      return s;
+    } catch (e) { return String(raw); }
+  };
+
+  const getBinanceInterval = () => normalizeIntervalForBinance(interval);
+
   const fetchAndInit = useCallback(async (target = symbol) => {
     try {
       const t = (target || symbol).toString();
       setStatus('fetching historical klines');
       const norm = t.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
   // use Binance Futures (USDT-M) REST endpoint for klines; interval is configurable
-  const url = `https://fapi.binance.com/fapi/v1/klines?symbol=${norm}&interval=${interval}&limit=500`;
+  // normalize interval to Binance-accepted token (e.g., convert '240m' -> '4h')
+  const bi = getBinanceInterval();
+  // request up to 1000 candles to provide long historical context for EMA calculations
+  const url = `https://fapi.binance.com/fapi/v1/klines?symbol=${norm}&interval=${bi}&limit=1000`;
     const res = await fetch(url);
       if (!res.ok) throw new Error(`Failed to fetch klines: ${res.status}`);
       const data = await res.json();
@@ -122,7 +159,7 @@ export default function useEmaCross({ symbol = 'BTCUSDT', autoConnect = true, de
 
     setStatus('connecting websocket');
     // Use combined stream: kline interval (configurable) + aggTrade for higher-frequency trade updates
-    const klineStream = `${targetNorm.toLowerCase()}@kline_${String(interval)}`;
+    const klineStream = `${targetNorm.toLowerCase()}@kline_${getBinanceInterval()}`;
   const tradeStream = `${targetNorm.toLowerCase()}@aggTrade`;
     const streams = `${klineStream}/${tradeStream}`;
   // use Binance Futures (USDT-M) websocket (fstream) combined stream
@@ -383,7 +420,7 @@ export default function useEmaCross({ symbol = 'BTCUSDT', autoConnect = true, de
             try {
               const sym = (reconnectTarget || symbol || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
               if (!sym) return;
-                  const url = `https://fapi.binance.com/fapi/v1/klines?symbol=${sym}&interval=${interval}&limit=10`;
+                  const url = `https://fapi.binance.com/fapi/v1/klines?symbol=${sym}&interval=${getBinanceInterval()}&limit=10`;
               const res = await fetch(url);
               if (!res.ok) return;
               const data = await res.json();

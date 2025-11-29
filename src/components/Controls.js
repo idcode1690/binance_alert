@@ -14,9 +14,7 @@ export default function Controls(props) {
     connect,
     disconnect,
   status,
-    // optional runtime server controls
-    serverUrl,
-    showToast,
+    // optional runtime server controls (removed from UI)
     // monitoring controls (parent values)
     monitorMinutes,
     setMonitorMinutes,
@@ -47,23 +45,14 @@ export default function Controls(props) {
   useEffect(() => { setEma2Str(String(monitorEma2 ?? '')); }, [monitorEma2]);
   // Confirm 값 변화에 따른 로컬 UI 처리 제거됨
 
-  // Server URL local state (prefill from props/localStorage or suggest default)
-  const suggestedDefault = 'https://binance-alert.idcode1690.workers.dev';
-  const initialServer = (() => {
-    try {
-      const ls = (typeof window !== 'undefined') ? (localStorage.getItem('serverUrl') || '') : '';
-      if (ls && ls.trim()) return ls.trim().replace(/\/$/, '');
-    } catch (e) {}
-    if (serverUrl) return serverUrl;
-    return '';
-  })();
-  const [serverStr, setServerStr] = useState(initialServer || suggestedDefault);
+  // Server URL runtime override UI removed — app will use build-time/default server settings.
 
   return (
-    <div className="controls">
-      <label className="controls-label">
-        <span className="label-text">Symbol</span>
-        <input type="text" value={symbol} onChange={(e) => {
+    <div className="panel scanner-panel">
+      <div className="scanner-controls-left">
+        <label className="controls-label">
+          <span className="label-text">Symbol</span>
+          <input type="text" value={symbol} onChange={(e) => {
           const v = e.target.value.toUpperCase();
           setSymbol(v);
           setSymbolValid(null);
@@ -99,11 +88,11 @@ export default function Controls(props) {
             } catch (err) { setSymbolValid(false); setSuggestions([]); }
           }, 600);
         }} />
-      </label>
+        </label>
 
-      <div className="control-inline-label" style={{ marginLeft: 8 }}>
-        <span className="label-text">Mins (candle interval)</span>
-        <div className="interval-btns" style={{ display: 'inline-flex', gap: 6, marginLeft: 8 }}>
+        <div className="control-inline-label" style={{ marginLeft: 8 }}>
+          <span className="label-text">Mins (candle interval)</span>
+          <div className="interval-btns" style={{ display: 'inline-flex', gap: 6, marginLeft: 8 }}>
           {[
             { label: '1m', val: '1' },
             { label: '5m', val: '5' },
@@ -125,30 +114,32 @@ export default function Controls(props) {
               {it.label}
             </button>
           ))}
+          </div>
         </div>
-      </div>
 
-      <label className="control-inline-label">
-        <span className="label-text">EMA1</span>
-        <input type="number" min="1" value={ema1Str} onChange={(e) => { setEma1Str(e.target.value); }} onBlur={() => {
+        <label className="control-inline-label">
+          <span className="label-text">EMA1</span>
+          <input className="ema-input" size="5" style={{width: '5ch'}} type="number" min="1" value={ema1Str} onChange={(e) => { setEma1Str(e.target.value); }} onBlur={() => {
           const p = parseInt(ema1Str, 10);
           if (!Number.isFinite(p) || p <= 0) return;
           setMonitorEma1(p);
         }} />
-      </label>
+        </label>
 
-      <label className="control-inline-label">
-        <span className="label-text">EMA2</span>
-        <input type="number" min="1" value={ema2Str} onChange={(e) => { setEma2Str(e.target.value); }} onBlur={() => {
+        <label className="control-inline-label">
+          <span className="label-text">EMA2</span>
+          <input className="ema-input" size="5" style={{width: '5ch'}} type="number" min="1" value={ema2Str} onChange={(e) => { setEma2Str(e.target.value); }} onBlur={() => {
           const p = parseInt(ema2Str, 10);
           if (!Number.isFinite(p) || p <= 0) return;
           setMonitorEma2(p);
         }} />
-      </label>
+        </label>
+      </div>
 
-  {/* Confirm 입력폼 제거됨 (monitorConfirm은 내부 로직만 유지) */}
+      <div className="scanner-controls">
+        {/* Confirm 입력폼 제거됨 (monitorConfirm은 내부 로직만 유지) */}
 
-      <button disabled={!(symbolValid === true) || status === 'reloading'} title={!(symbolValid === true) ? '유효한 심볼을 입력하세요' : (status === 'reloading' ? '초기화 중...' : 'Start')} onClick={async () => {
+        <button disabled={!(symbolValid === true) || status === 'reloading'} title={!(symbolValid === true) ? '유효한 심볼을 입력하세요' : (status === 'reloading' ? '초기화 중...' : 'Start')} onClick={async () => {
         const ok = await validateSymbolOnce(symbol);
         if (!ok) { setSymbolValid(false); return; }
         setSymbolValid(true);
@@ -167,43 +158,9 @@ export default function Controls(props) {
         }
       }}>Start</button>
 
-      <button className="secondary" onClick={() => disconnect()}>Stop</button>
+        <button className="secondary" onClick={() => disconnect()}>Stop</button>
 
-      <div style={{ marginTop: 10 }}>
-        <label className="controls-label">
-          <span className="label-text">Server URL</span>
-          <input type="text" value={serverStr} onChange={(e) => setServerStr(e.target.value)} placeholder={suggestedDefault} />
-        </label>
-        <button className="small-btn" onClick={async () => {
-          try {
-            const toStore = (serverStr || '').toString().trim().replace(/\/$/, '');
-            if (!toStore) {
-              try { localStorage.removeItem('serverUrl'); } catch (e) {}
-              try { sessionStorage.removeItem('serverUrlReachable'); } catch (e) {}
-              try { if (showToast) showToast('Server URL cleared', true); } catch (e) {}
-              return;
-            }
-            try { localStorage.setItem('serverUrl', toStore); } catch (e) {}
-            // do a quick /health check to mark session reachable
-            let ok = false;
-            try {
-              const ctrl = new AbortController();
-              const to = setTimeout(() => { try { ctrl.abort(); } catch (e) {} }, 1500);
-              try {
-                const h = await fetch(`${toStore}/health`, { signal: ctrl.signal });
-                if (h && h.ok) ok = true;
-              } catch (e) { ok = false; }
-              clearTimeout(to);
-            } catch (e) { ok = false; }
-            try { if (ok) { sessionStorage.setItem('serverUrlReachable', '1'); if (showToast) showToast('Server saved and reachable', true); } else { if (showToast) showToast('Server saved but unreachable (will be cleared on error)', false); } } catch (e) {}
-          } catch (e) { try { if (showToast) showToast(`Failed to set server URL: ${String(e)}`, false); } catch (ee) {} }
-        }}>Set</button>
-        <button className="small-btn" onClick={() => { try { localStorage.removeItem('serverUrl'); sessionStorage.removeItem('serverUrlReachable'); setServerStr(''); if (showToast) showToast('Server URL cleared', true); } catch (e) {} }}>Clear</button>
       </div>
-
-      {/* Set Server URL 및 Test Telegram 버튼 제거 요청에 따라 UI에서 숨김 */}
-
-      {/* removed Auto-start and Debug checkboxes as requested */}
 
     </div>
   );
@@ -231,6 +188,5 @@ Controls.propTypes = {
   monitorConfirm: PropTypes.number.isRequired,
   setMonitorConfirm: PropTypes.func.isRequired,
   // optional runtime server controls
-  serverUrl: PropTypes.string,
-  showToast: PropTypes.func,
+  // serverUrl / set/clear UI removed — no runtime server override props
 };

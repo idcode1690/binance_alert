@@ -688,6 +688,77 @@ function App() {
           <div className="card scanner-full">
             <ScannerPage availableSymbols={availableSymbols} fetchExchangeInfo={fetchExchangeInfo} monitorMinutes={monitorMinutes} setMonitorMinutes={setMonitorMinutes} monitorEma1={monitorEma1} setMonitorEma1={setMonitorEma1} monitorEma2={monitorEma2} setMonitorEma2={setMonitorEma2} />
           </div>
+        ) : view === 'alerts' ? (
+          // Single-card Alerts view: show controls and alerts inside one card
+          <div className="card main-card">
+            <Header />
+            {/* Controls placed directly under header to match Scanner layout spacing */}
+            <Controls
+                symbol={symbol}
+                setSymbol={setSymbol}
+                symbolValid={symbolValid}
+                setSymbolValid={setSymbolValid}
+                suggestions={suggestions}
+                setSuggestions={setSuggestions}
+                availableSymbols={availableSymbols}
+                validateSymbolOnce={validateSymbolOnce}
+                connect={setServerAndConnect}
+                disconnect={disconnect}
+                status={status}
+                connected={connected}
+                monitorMinutes={monitorMinutes}
+                setMonitorMinutes={setMonitorMinutes}
+                monitorEma1={monitorEma1}
+                setMonitorEma1={setMonitorEma1}
+                monitorEma2={monitorEma2}
+                setMonitorEma2={setMonitorEma2}
+                monitorConfirm={monitorConfirm}
+                setMonitorConfirm={setMonitorConfirm}
+                showToast={showToast}
+              />
+            <div style={{ marginTop: 12 }}>
+              <Metrics activeSymbol={activeSymbol} symbol={symbol} lastPrice={lastPrice} lastTick={lastTick} lastCandleClosed={lastCandleClosed} cross={cross} confirmedCross={confirmedCross} ema9={ema9} ema26={ema26} monitorEma1={monitorEma1} monitorEma2={monitorEma2} />
+            </div>
+            <div style={{ marginTop: 12 }}>
+              <Notes>Notes: This app uses Binance public REST + websocket. Make sure network allows wss access to stream.binance.com.</Notes>
+            </div>
+
+            {/* inline toast for quick feedback */}
+            {toast && (
+              <div className={`toast ${toast.ok ? 'toast-ok' : 'toast-err'}`} role="status" aria-live="polite">
+                <div className="toast-title">{toast.ok ? 'Success' : 'Error'}</div>
+                <div className="toast-body">{toast.message}</div>
+              </div>
+            )}
+
+            {status === 'reloading' && (
+              <div className="loading-text">초기화 중... 잠시만 기다려주세요</div>
+            )}
+
+            {symbolValid === false && (
+              <div className="invalid-msg">
+                Invalid symbol — please check the trading pair (e.g. BTCUSDT)
+              </div>
+            )}
+
+            <div className="status" style={{ marginTop: 8 }}>
+              Status: <strong>{status}</strong> {connected ? <span className="status-connected">(connected)</span> : <span className="status-disconnected">(disconnected)</span>}
+            </div>
+
+            <Alerts
+              events={events}
+              removeAlertByTs={removeAlertByTs}
+              symbol={symbol}
+              symbolValid={symbolValid}
+              status={status}
+              connect={setServerAndConnect}
+              disconnect={disconnect}
+              monitorMinutes={monitorMinutes}
+              monitorEma1={monitorEma1}
+              monitorEma2={monitorEma2}
+              monitorConfirm={monitorConfirm}
+            />
+          </div>
         ) : (
           <div className="layout-grid">
             <aside className="sidebar">
@@ -713,7 +784,6 @@ function App() {
                   setMonitorEma2={setMonitorEma2}
                   monitorConfirm={monitorConfirm}
                   setMonitorConfirm={setMonitorConfirm}
-                  serverUrl={serverUrl}
                   showToast={showToast}
                 />
                 <div style={{ marginTop: 12 }}>

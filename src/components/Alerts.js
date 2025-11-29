@@ -1,23 +1,38 @@
-import React from 'react';
+import React, { useState } from 'react';
 
-export default function Alerts({ events = [], removeAlertByTs, symbol, symbolValid, status, connect, disconnect, monitorMinutes, monitorEma1, monitorEma2, monitorConfirm }) {
-  // Only show primary alert events (bull/bear). Hide telegram_send / telegram status events
+export default function Alerts({ events = [], removeAlertByTs, symbol, monitorMinutes, monitorEma1, monitorEma2 }) {
   const normTarget = (symbol || '').toString().replace(/[^A-Za-z0-9]/g, '').toUpperCase();
   const visible = (events || []).filter((ev) => {
     try {
       if (!ev || !ev.type) return false;
       const t = (ev.type || '').toString();
-      // hide auxiliary telegram events
       if (t.startsWith('telegram')) return false;
-      // only show items for the currently-selected symbol
       const evSym = (ev.symbol || '').toString().replace(/[^A-Za-z0-9]/g, '').toUpperCase();
       if (normTarget && evSym !== normTarget) return false;
-      // show only bull/bear or similar alert types
       return t === 'bull' || t === 'bear' || t === 'alert';
     } catch (e) {
       return false;
     }
   });
+
+  const [copiedSymbol, setCopiedSymbol] = useState(null);
+
+  const copyToClipboard = async (s) => {
+    try {
+      if (navigator && navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(s);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = s;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      setCopiedSymbol(s);
+      setTimeout(() => setCopiedSymbol(null), 1200);
+    } catch (e) {}
+  };
 
   if (!visible || visible.length === 0) return null;
 
@@ -28,7 +43,6 @@ export default function Alerts({ events = [], removeAlertByTs, symbol, symbolVal
           <div className="alerts-title">Alerts</div>
           <div className="monitor-badge">{`${monitorMinutes}m · EMA${monitorEma1}/${monitorEma2}`}</div>
         </div>
-        {/* Controls (Start/Stop) are shown in the Controls panel; remove duplicate buttons from here */}
       </div>
 
       <ul className="alerts-list">
@@ -36,7 +50,9 @@ export default function Alerts({ events = [], removeAlertByTs, symbol, symbolVal
           <li key={ev?.ts ?? i} className="alert-item">
             <div className="alert-left">
               <span className={`alert-indicator ${ev.type === 'bull' ? 'bull' : 'bear'}`} />
-              <div className="alert-symbol">{ev.symbol || ''}</div>
+              <button type="button" className={`alert-symbol copy-btn ${copiedSymbol === ev.symbol ? 'copied' : ''}`} title="Copy symbol" onClick={(e) => { e.preventDefault(); copyToClipboard(ev.symbol || ''); }}>
+                {ev.symbol || ''}
+              </button>
             </div>
 
             <div className="alert-body">

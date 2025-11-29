@@ -113,8 +113,8 @@ export default function ScannerPage({ availableSymbols, fetchExchangeInfo, monit
         interval: intervalVal,
         emaShort: Number.isFinite(ema1) && ema1 > 0 ? ema1 : monitorEma1,
         emaLong: Number.isFinite(ema2) && ema2 > 0 ? ema2 : monitorEma2,
-        // explicitly request 400 candles for scanning to ensure stable EMA seeding
-        klineLimit: 400,
+        // explicitly request 1000 candles for scanning to ensure stable EMA seeding
+        klineLimit: 1000,
         // real-time monitoring mode
         monitor: true,
         pollIntervalMs: (Number.isFinite(intervalVal) ? (intervalVal * 60 * 1000 + 5000) : undefined),
@@ -147,8 +147,8 @@ export default function ScannerPage({ availableSymbols, fetchExchangeInfo, monit
         interval: intervalVal2,
         emaShort: Number.isFinite(ema1) && ema1 > 0 ? ema1 : monitorEma1,
         emaLong: Number.isFinite(ema2) && ema2 > 0 ? ema2 : monitorEma2,
-        // explicitly request 400 candles for scanning to ensure stable EMA seeding
-        klineLimit: 400,
+        // explicitly request 1000 candles for scanning to ensure stable EMA seeding
+        klineLimit: 1000,
         monitor: true,
         pollIntervalMs: (Number.isFinite(intervalVal2) ? (intervalVal2 * 60 * 1000 + 5000) : undefined),
         concurrency: 2,
@@ -286,14 +286,14 @@ export default function ScannerPage({ availableSymbols, fetchExchangeInfo, monit
           </div>
           <label className="control-inline-label">
             <span className="label-text">EMA1</span>
-            <input type="text" inputMode="numeric" pattern="\d*" value={ema1Str} onChange={(e) => setEma1Str(e.target.value)} onBlur={() => {
+            <input className="ema-input" size="5" style={{width: '5ch'}} type="text" inputMode="numeric" pattern="\d*" value={ema1Str} onChange={(e) => setEma1Str(e.target.value)} onBlur={() => {
               const p = parseInt(ema1Str, 10);
               if (Number.isFinite(p) && p > 0) saveScannerDefaults(parseInt(minsStr, 10) || '', p, parseInt(ema2Str, 10) || '');
             }} />
           </label>
           <label className="control-inline-label">
             <span className="label-text">EMA2</span>
-            <input type="text" inputMode="numeric" pattern="\d*" value={ema2Str} onChange={(e) => setEma2Str(e.target.value)} onBlur={() => {
+            <input className="ema-input" size="5" style={{width: '5ch'}} type="text" inputMode="numeric" pattern="\d*" value={ema2Str} onChange={(e) => setEma2Str(e.target.value)} onBlur={() => {
               const p = parseInt(ema2Str, 10);
               if (Number.isFinite(p) && p > 0) saveScannerDefaults(parseInt(minsStr, 10) || '', parseInt(ema1Str, 10) || '', p);
             }} />
