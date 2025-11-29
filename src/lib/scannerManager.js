@@ -64,7 +64,37 @@ const scannerManager = (() => {
     if (typeof interval === 'number' || (typeof interval === 'string' && /^\d+$/.test(String(interval)))) interval = `${interval}m`;
     const emaShort = (opts && typeof opts.emaShort !== 'undefined') ? parseInt(opts.emaShort, 10) : 26;
     const emaLong = (opts && typeof opts.emaLong !== 'undefined') ? parseInt(opts.emaLong, 10) : 200;
-    const filtered = (Array.isArray(list) ? list.filter(s => typeof s === 'string' && /USDT$/i.test(s)) : []);
+    // Normalize / sanitize incoming symbol list to reduce typos like 'BTCSTUSDT'
+    const sanitizeSymbol = (raw) => {
+      if (!raw) return '';
+      try {
+        let s = String(raw).toUpperCase();
+        // strip any non-alphanumeric chars
+        s = s.replace(/[^A-Z0-9]/g, '');
+        // collapse repeated USDT occurrences (e.g. 'BTCUSDTUSDT' -> 'BTCUSDT')
+        s = s.replace(/(USDT)+$/g, 'USDT');
+        s = s.replace(/USDTUSDT/g, 'USDT');
+        // If the result doesn't end with USDT it's not a futures symbol we care about
+        if (!/USDT$/.test(s)) return '';
+        // Basic sanity: symbol length should be reasonable
+        if (s.length < 6 || s.length > 12) return '';
+        return s;
+      } catch (e) { return ''; }
+    };
+
+    // Build a unique, normalized filtered list to use for API calls.
+    const normalized = [];
+    if (Array.isArray(list)) {
+      const seen = new Set();
+      for (const it of list) {
+        const n = sanitizeSymbol(it);
+        if (!n) continue;
+        if (seen.has(n)) continue;
+        seen.add(n);
+        normalized.push(n);
+      }
+    }
+    const filtered = normalized;
     // Validate symbols against Binance exchangeInfo to avoid scanning invalid/typo symbols
     progress.total = filtered.length; notifyThrottled(true);
     try {
