@@ -185,8 +185,10 @@ const scannerManager = (() => {
     // Lower default concurrency and increase base batch delay to reduce risk of
     // hitting Binance rate limits under high-load scans. These can be overridden
     // via opts if the caller wants different tuning.
-    const concurrencyDefault = (opts && typeof opts.concurrency === 'number') ? Math.max(1, opts.concurrency) : 4;
-    const batchDelayBase = (opts && typeof opts.batchDelay === 'number') ? Math.max(0, opts.batchDelay) : 500;
+    // Reduce default concurrency to 2 for conservative operation and increase
+    // base batch delay to reduce request bursts that trigger rate limits.
+    const concurrencyDefault = (opts && typeof opts.concurrency === 'number') ? Math.max(1, opts.concurrency) : 2;
+    const batchDelayBase = (opts && typeof opts.batchDelay === 'number') ? Math.max(0, opts.batchDelay) : 1000;
     let concurrencyCurrent = concurrencyDefault; let batchDelayCurrent = batchDelayBase;
     const maxConcurrency = (opts && typeof opts.maxConcurrency === 'number') ? Math.max(1, opts.maxConcurrency) : 12;
     let backoffCount = 0; let consecutiveSuccesses = 0;
