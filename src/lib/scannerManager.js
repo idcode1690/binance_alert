@@ -182,8 +182,11 @@ const scannerManager = (() => {
       }
     }
 
-    const concurrencyDefault = (opts && typeof opts.concurrency === 'number') ? Math.max(1, opts.concurrency) : 8;
-    const batchDelayBase = (opts && typeof opts.batchDelay === 'number') ? Math.max(0, opts.batchDelay) : 120;
+    // Lower default concurrency and increase base batch delay to reduce risk of
+    // hitting Binance rate limits under high-load scans. These can be overridden
+    // via opts if the caller wants different tuning.
+    const concurrencyDefault = (opts && typeof opts.concurrency === 'number') ? Math.max(1, opts.concurrency) : 4;
+    const batchDelayBase = (opts && typeof opts.batchDelay === 'number') ? Math.max(0, opts.batchDelay) : 500;
     let concurrencyCurrent = concurrencyDefault; let batchDelayCurrent = batchDelayBase;
     const maxConcurrency = (opts && typeof opts.maxConcurrency === 'number') ? Math.max(1, opts.maxConcurrency) : 12;
     let backoffCount = 0; let consecutiveSuccesses = 0;
@@ -203,17 +206,39 @@ const scannerManager = (() => {
       const url = `${endpointBase}?symbol=${encodeURIComponent(sym)}&interval=${encodeURIComponent(interval)}&limit=${candleLimit}`;
       let localAbort = null; try { localAbort = new AbortController(); currentAbortControllers.add(localAbort); } catch (e) {}
       try {
-        const r = await fetch(url, localAbort ? { signal: localAbort.signal } : undefined);
-        if (!r.ok) {
-          // Too many requests -> backoff and retry later
-          if (r.status === 429) {
-            backoffCount += 1; consecutiveSuccesses = 0; concurrencyCurrent = Math.max(1, Math.floor(concurrencyCurrent * 0.6)); batchDelayCurrent = Math.min(30000, Math.floor(batchDelayCurrent * 1.6));
-            const backoffMs = Math.min(30000, 1000 * Math.pow(2, Math.min(backoffCount, 6)) + Math.floor(Math.random() * 1000));
-            await sleep(backoffMs);
-            return;
+        // implement a small retry loop for 429s with exponential backoff + jitter
+        const maxRetries = 3;
+        let attempt = 0;
+        let r = null;
+        for (; attempt <= maxRetries; attempt += 1) {
+          try {
+            r = await fetch(url, localAbort ? { signal: localAbort.signal } : undefined);
+          } catch (fetchErr) {
+            // network/type errors -> break and treat as failure (will be caught below)
+            r = null;
           }
-          // Bad request often means an invalid symbol (typo or delisted). Remove it to avoid repeated 400s.
-          if (r.status === 400) {
+          if (r && r.ok) break; // success
+          if (r && r.status === 429) {
+            // rate-limited -> increase backoff pressure and retry after delay
+            backoffCount += 1;
+            consecutiveSuccesses = 0;
+            concurrencyCurrent = Math.max(1, Math.floor(concurrencyCurrent * 0.6));
+            batchDelayCurrent = Math.min(30000, Math.floor(batchDelayCurrent * 1.8));
+            const backoffMs = Math.min(60000, 1000 * Math.pow(2, Math.min(backoffCount, 8)) + Math.floor(Math.random() * 2000));
+            // if we've exhausted retries, give up this symbol for now
+            if (attempt === maxRetries) {
+              await sleep(backoffMs);
+              return;
+            }
+            await sleep(backoffMs);
+            continue; // retry
+          }
+          // non-429 non-ok responses -> handle below (e.g., 400 invalid symbol)
+          break;
+        }
+        if (!r || !r.ok) {
+          // final handling for non-ok responses
+          if (r && r.status === 400) {
             try { console.warn('[scannerManager] removing invalid symbol due to 400', sym); } catch (e) {}
             try {
               const idx = filtered.indexOf(sym);
@@ -225,6 +250,7 @@ const scannerManager = (() => {
             } catch (e) {}
             return;
           }
+          // give up this symbol on persistent errors
           return;
         }
         const data = await r.json();
