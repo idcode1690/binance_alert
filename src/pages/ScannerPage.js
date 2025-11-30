@@ -109,8 +109,18 @@ export default function ScannerPage({ availableSymbols, fetchExchangeInfo, monit
         return;
       }
       const intervalVal = Number.isFinite(mins) && mins > 0 ? mins : monitorMinutes;
+      // normalize interval value to Binance-compatible token (e.g. 240 -> '4h', 5 -> '5m')
+      const normalizeInterval = (val) => {
+        try {
+          const n = Number(val);
+          if (!Number.isFinite(n) || n <= 0) return String(val);
+          if (n % 60 === 0) return `${n / 60}h`;
+          return `${n}m`;
+        } catch (e) { return String(val); }
+      };
+      const intervalToken = normalizeInterval(intervalVal);
       const opts = {
-        interval: intervalVal,
+        interval: intervalToken,
         emaShort: Number.isFinite(ema1) && ema1 > 0 ? ema1 : monitorEma1,
         emaLong: Number.isFinite(ema2) && ema2 > 0 ? ema2 : monitorEma2,
         // explicitly request 1000 candles for scanning to ensure stable EMA seeding
@@ -143,8 +153,18 @@ export default function ScannerPage({ availableSymbols, fetchExchangeInfo, monit
         return;
       }
       const intervalVal2 = Number.isFinite(mins) && mins > 0 ? mins : monitorMinutes;
+      // normalize interval value to Binance-compatible token
+      const normalizeInterval = (val) => {
+        try {
+          const n = Number(val);
+          if (!Number.isFinite(n) || n <= 0) return String(val);
+          if (n % 60 === 0) return `${n / 60}h`;
+          return `${n}m`;
+        } catch (e) { return String(val); }
+      };
+      const intervalToken2 = normalizeInterval(intervalVal2);
       const opts = {
-        interval: intervalVal2,
+        interval: intervalToken2,
         emaShort: Number.isFinite(ema1) && ema1 > 0 ? ema1 : monitorEma1,
         emaLong: Number.isFinite(ema2) && ema2 > 0 ? ema2 : monitorEma2,
         // explicitly request 1000 candles for scanning to ensure stable EMA seeding
