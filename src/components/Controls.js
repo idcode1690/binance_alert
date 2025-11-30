@@ -91,7 +91,7 @@ export default function Controls(props) {
         </label>
 
         <div className="control-inline-label" style={{ marginLeft: 8 }}>
-          <span className="label-text">Mins (candle interval)</span>
+          <span className="label-text">Mins</span>
           <div className="interval-btns" style={{ display: 'inline-flex', gap: 6, marginLeft: 8 }}>
           {[
             { label: '1m', val: '1' },

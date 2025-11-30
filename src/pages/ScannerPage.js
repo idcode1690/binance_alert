@@ -310,7 +310,7 @@ export default function ScannerPage({ availableSymbols, fetchExchangeInfo, monit
   <div className="panel scanner-panel">
         <div className="scanner-controls-left">
           <div className="control-inline-label">
-            <span className="label-text">Mins (candle interval)</span>
+            <span className="label-text">Mins</span>
             <div className="interval-btns" style={{ display: 'inline-flex', gap: 6, marginLeft: 8 }}>
               {[{ label: '1m', val: '1' }, { label: '5m', val: '5' }, { label: '30m', val: '30' }, { label: '4h', val: '240' }].map((it) => (
                 <button key={it.val} type="button" className={`small-interval-btn ${String(minsStr) === String(it.val) ? 'active' : ''}`} onClick={() => {
