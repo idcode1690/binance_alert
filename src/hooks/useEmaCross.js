@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { calculateInitialEMA, updateEMA } from '../utils/ema';
 
 // Hook options: { symbol }
-export default function useEmaCross({ symbol = 'BTCUSDT', autoConnect = true, debug = false, interval = '1m', emaShort = 9, emaLong = 26, confirmClosedCandles = 1 } = {}) {
+export default function useEmaCross({ symbol = 'BTCUSDT', autoConnect = true, debug = false, interval = '1m', emaShort = 9, emaLong = 26, confirmClosedCandles = 1, klineLimit = 1000 } = {}) {
   const [ema9, setEma9] = useState(null);
   const [ema26, setEma26] = useState(null);
   const [lastPrice, setLastPrice] = useState(null);
@@ -87,7 +87,7 @@ export default function useEmaCross({ symbol = 'BTCUSDT', autoConnect = true, de
   // normalize interval to Binance-accepted token (e.g., convert '240m' -> '4h')
   const bi = normalizeIntervalForBinance(interval);
   // request up to 1000 candles to provide long historical context for EMA calculations
-  const url = `https://fapi.binance.com/fapi/v1/klines?symbol=${norm}&interval=${bi}&limit=1000`;
+  const url = `https://fapi.binance.com/fapi/v1/klines?symbol=${norm}&interval=${bi}&limit=${Math.max(100, Math.min(1000, Number(klineLimit) || 1000))}`;
     const res = await fetch(url);
       if (!res.ok) throw new Error(`Failed to fetch klines: ${res.status}`);
       const data = await res.json();

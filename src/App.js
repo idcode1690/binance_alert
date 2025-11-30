@@ -153,7 +153,7 @@ function App() {
   // (moved below after hook initialization because it depends on connected/disconnect)
   // Disable hook autoConnect: App will control connecting so we can update server monitor symbol first
   // Guard against unexpected undefined return (e.g., faulty Jest mock) to keep tests stable.
-  const hookData = useEmaCross({ symbol, autoConnect: true, debug: showDebug, interval: `${monitorMinutes}m`, emaShort: monitorEma1, emaLong: monitorEma2, confirmClosedCandles: monitorConfirm }) || {};
+  const hookData = useEmaCross({ symbol, autoConnect: true, debug: showDebug, interval: `${monitorMinutes}m`, emaShort: monitorEma1, emaLong: monitorEma2, confirmClosedCandles: monitorConfirm, klineLimit: 1000 }) || {};
   const { ema9, ema26, lastPrice, lastTick, lastCandleClosed, cross, confirmedCross, confirmedSource, connected, status, connect, disconnect, activeSymbol } = hookData;
 
   
