@@ -557,8 +557,17 @@ button.secondary {
 
 /* Controls classes */
 .controls-label { display: flex; align-items: center; gap: 8px; }
-.control-inline-label { margin-left: 12px; display: flex; align-items: center; gap: 8px; }
+.control-inline-label { margin-left: 12px; display: inline-flex; align-items: center; gap: 8px; min-height: 36px; }
 .label-text { font-size: 13px; }
+
+/* Ensure titles and control groups share the same height and vertical alignment
+   so the time-selection buttons and titles render consistently across
+   the Alerts and Scanner pages. */
+.alerts-title, .title {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+}
 
 /* Debug panel */
 .debug-panel { margin-top: 12px; padding: 10px; border: 1px dashed var(--panel-border); border-radius: 8px; background: var(--card-bg); }
