@@ -209,6 +209,19 @@ export default function ScannerPage({ availableSymbols, fetchExchangeInfo, monit
     return arr;
   }, [state.results]);
 
+  // also provide a sorted active list by volume so active monitoring shows highest-volume first
+  const sortedActive = useMemo(() => {
+    const arr = Array.isArray(state.active) ? state.active.slice() : [];
+    try {
+      arr.sort((a, b) => {
+        const va = (a && typeof a.volume === 'number') ? a.volume : (a && a.volume ? Number(a.volume) : 0);
+        const vb = (b && typeof b.volume === 'number') ? b.volume : (b && b.volume ? Number(b.volume) : 0);
+        return (vb || 0) - (va || 0);
+      });
+    } catch (e) {}
+    return arr;
+  }, [state.active]);
+
   // use a ticking 'now' so we can compute elapsed from manager's persistent scanStartTime
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
@@ -359,8 +372,8 @@ export default function ScannerPage({ availableSymbols, fetchExchangeInfo, monit
 
       {/* Active monitoring list: shows currently-active crosses (real-time). Falls back to historical results. */}
       <ul className="alerts-list">
-        {Array.isArray(state.active) && state.active.length > 0 ? (
-          state.active.map((r, idx) => (
+        {Array.isArray(sortedActive) && sortedActive.length > 0 ? (
+          sortedActive.map((r, idx) => (
             <li key={r.id || `${r.symbol}-active-${idx}`} className="alert-item">
               <div className="alert-left">
                 {(() => {
