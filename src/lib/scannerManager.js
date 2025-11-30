@@ -202,6 +202,39 @@ const scannerManager = (() => {
       ? Math.min(1000, Math.max(klineLimitOpt, neededCandles + 1))
       : Math.min(1000, Math.max(neededCandles + 10, 120));
 
+    // Simple token-bucket rate limiter for REST requests to avoid hitting Binance rate limits.
+    // Defaults to a conservative 6 requests/second (can be overridden via opts.rateLimitPerSec).
+    const rateLimitPerSec = (opts && typeof opts.rateLimitPerSec === 'number') ? Math.max(1, opts.rateLimitPerSec) : 6;
+    const bucketCapacity = Math.max(1, Math.floor(rateLimitPerSec));
+    let tokens = bucketCapacity;
+    let lastRefill = Date.now();
+    const refillTokens = () => {
+      const now = Date.now();
+      const elapsed = now - lastRefill;
+      if (elapsed <= 0) return;
+      const add = (elapsed / 1000) * rateLimitPerSec;
+      if (add < 1) return;
+      tokens = Math.min(bucketCapacity, tokens + Math.floor(add));
+      lastRefill = now;
+    };
+    const acquireToken = async () => {
+      // try to acquire a token, waiting up to a short timeout loop
+      for (let i = 0; i < 200; i += 1) {
+        refillTokens();
+        if (tokens > 0) { tokens -= 1; return; }
+        // sleep a short bit before retrying
+        // use smaller delay when concurrency is low
+        await sleep(50);
+      }
+      // fallback wait a bit longer if tokens couldn't be acquired
+      await sleep(500);
+      refillTokens();
+      if (tokens > 0) { tokens -= 1; }
+    };
+
+    // When we detect sustained 429s, pause the whole scanner briefly to allow rate limits to recover
+    let globalPauseUntil = 0;
+
     const processSymbol = async (sym) => {
       if (cancel) return;
       currentSymbol = sym; notifyThrottled();
@@ -209,11 +242,18 @@ const scannerManager = (() => {
       let localAbort = null; try { localAbort = new AbortController(); currentAbortControllers.add(localAbort); } catch (e) {}
       try {
         // implement a small retry loop for 429s with exponential backoff + jitter
-        const maxRetries = 3;
+        const maxRetries = (opts && typeof opts.maxRetries === 'number') ? Math.max(1, opts.maxRetries) : 5;
         let attempt = 0;
         let r = null;
         for (; attempt <= maxRetries; attempt += 1) {
           try {
+            // Respect a global pause if we've been rate-limited heavily
+            if (globalPauseUntil && Date.now() < globalPauseUntil) {
+              const wait = globalPauseUntil - Date.now();
+              await sleep(wait);
+            }
+            // Acquire a rate-limiter token before issuing the REST request
+            try { await acquireToken(); } catch (e) {}
             r = await fetch(url, localAbort ? { signal: localAbort.signal } : undefined);
           } catch (fetchErr) {
             // network/type errors -> break and treat as failure (will be caught below)
@@ -226,9 +266,19 @@ const scannerManager = (() => {
             consecutiveSuccesses = 0;
             concurrencyCurrent = Math.max(1, Math.floor(concurrencyCurrent * 0.6));
             batchDelayCurrent = Math.min(30000, Math.floor(batchDelayCurrent * 1.8));
-            const backoffMs = Math.min(60000, 1000 * Math.pow(2, Math.min(backoffCount, 8)) + Math.floor(Math.random() * 2000));
+            // respect server-suggested Retry-After header when present
+            let backoffMs = Math.min(60000, 1000 * Math.pow(2, Math.min(backoffCount, 8)) + Math.floor(Math.random() * 2000));
+            try {
+              const ra = r.headers && (r.headers.get ? r.headers.get('Retry-After') : (r.headers['retry-after'] || r.headers['Retry-After']));
+              if (ra) {
+                const parsed = parseInt(ra, 10);
+                if (Number.isFinite(parsed) && parsed > 0) backoffMs = Math.max(backoffMs, parsed * 1000);
+              }
+            } catch (e) {}
             // if we've exhausted retries, give up this symbol for now
             if (attempt === maxRetries) {
+              // on final exhaustion, apply a longer global pause to avoid repeated 429s
+              globalPauseUntil = Date.now() + Math.min(5 * 60 * 1000, backoffMs * 2);
               await sleep(backoffMs);
               return;
             }
