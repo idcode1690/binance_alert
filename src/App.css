@@ -685,6 +685,13 @@ button.secondary {
   color: var(--text) !important;
   border-radius: 6px !important;
 }
+/* Alerts page: widen EMA inputs by +20px relative to 5ch
+   Use a more specific selector so only the Alerts main-card is affected. */
+.card.main-card .control-inline-label .ema-input {
+  width: calc(5ch + 20px) !important;
+  min-width: calc(5ch + 20px) !important;
+  max-width: calc(5ch + 20px) !important;
+}
 .scanner-progress-left {
   font-family: -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   font-size: 0.75rem;
