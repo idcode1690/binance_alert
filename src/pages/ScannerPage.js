@@ -84,7 +84,19 @@ export default function ScannerPage({ availableSymbols, fetchExchangeInfo, monit
 
   const saveScannerDefaults = useCallback((mins, ema1, ema2) => {
     try {
-      const obj = { mins: mins, ema1: ema1, ema2: ema2 };
+      // Normalize `mins` so we always persist numeric minutes (e.g., '5', '30', '240')
+      const normalizeToMinutes = (v) => {
+        if (v == null) return '';
+        const s = String(v).trim();
+        const mMatch = s.match(/^(\d+)m$/i);
+        if (mMatch) return String(parseInt(mMatch[1], 10));
+        const hMatch = s.match(/^(\d+)h$/i);
+        if (hMatch) return String(parseInt(hMatch[1], 10) * 60);
+        const n = parseInt(s, 10);
+        if (Number.isFinite(n)) return String(n);
+        return '';
+      };
+      const obj = { mins: normalizeToMinutes(mins), ema1: ema1, ema2: ema2 };
       localStorage.setItem('scannerDefaults', JSON.stringify(obj));
     } catch (e) {}
   }, []);
