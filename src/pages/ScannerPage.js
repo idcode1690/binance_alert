@@ -17,8 +17,19 @@ export default function ScannerPage({ availableSymbols, fetchExchangeInfo, monit
       const raw = localStorage.getItem('scannerDefaults');
       if (raw) {
         const p = JSON.parse(raw);
+        const normalizeToMinutes = (v) => {
+          if (v == null) return '5';
+          const s = String(v).trim();
+          const mMatch = s.match(/^(\d+)m$/i);
+          if (mMatch) return String(parseInt(mMatch[1], 10));
+          const hMatch = s.match(/^(\d+)h$/i);
+          if (hMatch) return String(parseInt(hMatch[1], 10) * 60);
+          const n = parseInt(s, 10);
+          if (Number.isFinite(n)) return String(n);
+          return '5';
+        };
         return {
-          mins: typeof p.mins !== 'undefined' ? String(p.mins) : '5',
+          mins: (typeof p.mins !== 'undefined') ? normalizeToMinutes(p.mins) : '5',
           ema1: typeof p.ema1 !== 'undefined' ? String(p.ema1) : '26',
           ema2: typeof p.ema2 !== 'undefined' ? String(p.ema2) : '200',
         };
