@@ -95,6 +95,16 @@
   margin-right: auto;
   box-sizing: border-box;
 }
+
+/* Make control inline labels (Mins / EMA inputs) consistently sized and vertically centered
+   across Scanner and Alerts/Controls panels. This ensures the interval button groups and
+   adjacent inputs share the same visual height. */
+.control-inline-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+}
 .header {
   display: flex;
   align-items: center;
