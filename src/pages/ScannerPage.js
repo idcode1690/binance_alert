@@ -134,6 +134,8 @@ export default function ScannerPage({ availableSymbols, fetchExchangeInfo, monit
         maxConcurrency: 4,
       };
       scannerManager.start('golden', opts);
+      // clear any previously-shown result IDs so we re-list and beep for new matches
+      try { if (shownResultsRef && shownResultsRef.current) shownResultsRef.current.clear(); } catch (e) {}
       // persist scanner choices as defaults
       saveScannerDefaults(opts.interval, opts.emaShort, opts.emaLong);
     } catch (e) {}
@@ -176,6 +178,8 @@ export default function ScannerPage({ availableSymbols, fetchExchangeInfo, monit
         maxConcurrency: 4,
       };
       scannerManager.start('dead', opts);
+      // clear any previously-shown result IDs so we re-list and beep for new matches
+      try { if (shownResultsRef && shownResultsRef.current) shownResultsRef.current.clear(); } catch (e) {}
       // persist scanner choices as defaults
       saveScannerDefaults(opts.interval, opts.emaShort, opts.emaLong);
     } catch (e) {}
