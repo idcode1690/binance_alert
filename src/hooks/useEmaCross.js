@@ -131,7 +131,7 @@ export default function useEmaCross({ symbol = 'BTCUSDT', autoConnect = true, de
       setStatus(`init error: ${err.message}`);
       console.error(err);
     }
-  }, [symbol, interval, emaShort, emaLong, debug]);
+  }, [symbol, interval, emaShort, emaLong, debug, klineLimit]);
 
   const connect = useCallback(async (overrideSymbol) => {
     const targetSymbol = (overrideSymbol || symbol).toString();
