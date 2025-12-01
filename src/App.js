@@ -422,7 +422,7 @@ function App() {
       const toStore = { monitorMinutes: (typeof interval === 'string' && interval.endsWith('m')) ? Number(interval.replace(/m$/, '')) : Number(interval), monitorEma1: Number(emaShort), monitorEma2: Number(emaLong), lastSymbol: q };
       localStorage.setItem('lastMonitor', JSON.stringify(toStore));
     } catch (e) {}
-  }, [connect, monitorMinutes, monitorEma1, monitorEma2]);
+  }, [monitorMinutes, monitorEma1, monitorEma2]);
 
   
 
