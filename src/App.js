@@ -724,9 +724,7 @@ function App() {
             <div style={{ marginTop: 12 }}>
               <Metrics activeSymbol={activeSymbol} symbol={symbol} lastPrice={lastPrice} lastTick={lastTick} lastCandleClosed={lastCandleClosed} cross={cross} confirmedCross={confirmedCross} ema9={ema9} ema26={ema26} monitorEma1={monitorEma1} monitorEma2={monitorEma2} />
             </div>
-            <div style={{ marginTop: 12 }}>
-              <Notes>Notes: This app uses Binance public REST + websocket. Make sure network allows wss access to stream.binance.com.</Notes>
-            </div>
+            {/* Notes moved below Alerts */}
 
             {/* inline toast for quick feedback */}
             {toast && (
@@ -761,6 +759,9 @@ function App() {
               monitorEma2={monitorEma2}
               monitorConfirm={monitorConfirm}
             />
+            <div style={{ marginTop: 12 }}>
+              <Notes>Notes: This app uses Binance public REST + websocket. Make sure network allows wss access to stream.binance.com.</Notes>
+            </div>
           </div>
         ) : (
           <div className="layout-grid">
@@ -792,9 +793,7 @@ function App() {
                 <div style={{ marginTop: 12 }}>
                   <Metrics activeSymbol={activeSymbol} symbol={symbol} lastPrice={lastPrice} lastTick={lastTick} lastCandleClosed={lastCandleClosed} cross={cross} confirmedCross={confirmedCross} ema9={ema9} ema26={ema26} monitorEma1={monitorEma1} monitorEma2={monitorEma2} />
                 </div>
-                <div style={{ marginTop: 12 }}>
-                  <Notes>Notes: This app uses Binance public REST + websocket. Make sure network allows wss access to stream.binance.com.</Notes>
-                </div>
+                {/* Notes moved below Alerts */}
               </div>
             </aside>
             <main className="main-area">
@@ -852,6 +851,9 @@ function App() {
                   monitorEma2={monitorEma2}
                   monitorConfirm={monitorConfirm}
                 />
+                <div style={{ marginTop: 12 }}>
+                  <Notes>Notes: This app uses Binance public REST + websocket. Make sure network allows wss access to stream.binance.com.</Notes>
+                </div>
               </div>
             </main>
           </div>
