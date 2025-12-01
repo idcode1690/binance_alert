@@ -851,18 +851,19 @@ button.secondary {
   border: none;
   padding: 4px 6px;
   cursor: pointer;
-  color: var(--muted-2);
+  color: var(--text);
   font-size: 13px;
+  min-width: 84px;
 }
 .mobile-toggle:focus { outline: none; }
 .mobile-toggle .switch-track {
   width: 44px;
   height: 22px;
-  background: var(--muted-3);
+  background: var(--panel-border);
   border-radius: 999px;
   position: relative;
   display: inline-block;
-  transition: background 160ms ease;
+  transition: background 160ms ease, box-shadow 160ms ease;
 }
 .mobile-toggle .switch-knob {
   position: absolute;
@@ -874,10 +875,13 @@ button.secondary {
   background: var(--panel-bg);
   transition: transform 160ms ease, background 160ms ease;
   will-change: transform;
+  box-shadow: none;
+  border: 1px solid rgba(0,0,0,0.04);
 }
 .mobile-toggle.active .switch-track { background: var(--scanner-green); }
 .mobile-toggle.active .switch-knob { transform: translateX(22px); background: #fff; }
-.mobile-toggle .switch-label { font-size: 13px; color: var(--muted-2); }
+.mobile-toggle .switch-label { font-size: 13px; color: var(--text); }
+.mobile-toggle:focus-visible .switch-track { box-shadow: 0 0 0 3px rgba(16,185,129,0.12); }
 
 /* toast */
 .toast { position: absolute; top: 12px; right: 12px; padding: 8px 12px; border-radius: 6px; z-index: 20000; box-shadow: 0 2px 8px rgba(0,0,0,0.3); color: var(--button-text); }
