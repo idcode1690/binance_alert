@@ -1,3 +1,88 @@
+/* Mobile alarm button: force square shape */
+@media (max-width: 600px) {
+  .alarm-button,
+  .btn-alarm,
+  .mobile .alarm-button,
+  button.alarm,
+  .alarm-btn {
+    width: 48px;
+    height: 48px;
+    padding: 0;
+    border-radius: 8px; /* square-ish; adjust to 0 for perfect square */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  /* Apply square sizing to actual alert-related buttons used in UI */
+  .alerts .delete-btn,
+  .delete-result,
+  .alert-left .copy-btn {
+    width: 48px !important;
+    height: 48px !important;
+    min-width: 48px !important;
+    min-height: 48px !important;
+    padding: 0 !important;
+    border-radius: 8px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    box-sizing: border-box !important;
+  }
+  /* Ensure OFF/STOP buttons are square on mobile */
+  .scanner-controls .scanner-btn.stop,
+  .top-menu-bar .menu-btn,
+  .mobile-toggle {
+    width: 48px !important;
+    height: 48px !important;
+    min-width: 48px !important;
+    min-height: 48px !important;
+    padding: 0 !important;
+    border-radius: 8px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    box-sizing: border-box !important;
+    text-align: center !important;
+  }
+  /* Ensure inner switch layout centers text and knob within square */
+  .mobile-toggle .switch-track {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 0 !important;
+    width: 28px !important;
+    height: 28px !important;
+  }
+  .mobile-toggle .switch-inner { display: none !important; }
+  .mobile-toggle .switch-knob { position: static !important; transform: none !important; width: 14px !important; height: 14px !important; }
+  .mobile-toggle.active .switch-knob { transform: translateX(14px) !important; }
+}
+
+/* Stronger, final mobile overrides for Alerts view toggle */
+@media (max-width: 600px) {
+  .card.main-card .mobile-toggle {
+    width: 48px !important;
+    height: 48px !important;
+    min-width: 48px !important;
+    min-height: 48px !important;
+    padding: 0 !important;
+    border-radius: 8px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    box-sizing: border-box !important;
+  }
+  .card.main-card .mobile-toggle .switch-track {
+    width: 28px !important;
+    height: 28px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+  .card.main-card .mobile-toggle .switch-inner { display: none !important; }
+  .card.main-card .mobile-toggle .switch-knob { width: 14px !important; height: 14px !important; position: static !important; transform: none !important; }
+  .card.main-card .mobile-toggle.active .switch-knob { transform: translateX(14px) !important; }
+}
 .App {
   font-family: Inter, Roboto, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial;
   /* subtract the fixed top menu height so we don't create an extra page scrollbar
@@ -173,21 +258,7 @@ input[type="text"] {
 
 /* allow the symbol input to shrink before numeric inputs collapse */
 .controls .controls-label { flex: 0 1 auto; }
-.controls .controls-label input[type="text"] { 
-.mobile-toggle .switch-track {
-  width: 96px;
-  height: 26px;
-  background: var(--panel-border);
-  border-radius: 999px;
-  position: relative;
-  display: inline-block;
-  transition: background 160ms ease, box-shadow 160ms ease;
-  overflow: hidden;
-  padding: 0 8px;
-}
-  color: var(--text);
-  border-radius: 6px;
-}
+.controls .controls-label input[type="text"] { color: var(--text); border-radius: 6px; }
 
 /* slightly smaller buttons in controls area to save space */
 .controls > button { padding: 6px 10px; }
@@ -505,7 +576,7 @@ button.secondary {
   box-shadow: 0 2px 8px rgba(15,23,42,0.06);
   z-index: 9999;
 }
-.top-menu-bar .menu-btn {
+.top-menu-bar .menu-btn { }
 .mobile-toggle .switch-knob {
   position: absolute;
   top: 3px;
@@ -530,7 +601,6 @@ button.secondary {
   color: var(--scanner-red);
   margin-top: 8px;
 }
-
 .suggestions-wrap {
   margin-top: 8px;
 }
@@ -823,27 +893,33 @@ button.secondary {
   align-items: center;
   justify-content: center;
 }
+.daily-candle {
+  /* candle color variable used for both body and wick to ensure identical colors */
+  --candle-color: transparent;
+}
+
 .daily-candle .wick {
   position: absolute;
   width: 2px;
-  height: 26px; /* extend nearly full height to match top/bottom whitespace */
-  background: rgba(255,255,255,0.6);
+  /* do not hardcode height/top here — JS will set inline styles to control wick position/height */
   border-radius: 1px;
-  top: 1px;
+  transition: top 220ms ease, height 220ms ease, background-color 180ms ease;
 }
 .daily-candle .body {
   position: absolute;
   width: 12px;
-  height: 12px;
   border-radius: 1px;
-  top: 8px; /* centered vertically within the taller wick */
-  /* flat look: no gradients, no shadows, no borders */
+  /* do not hardcode top/height here — JS will set inline styles to control body position/height */
+  transition: top 220ms ease, height 220ms ease, background-color 180ms ease;
 }
-.daily-candle.bull .wick { background: rgba(255,255,255,0.6); }
-.daily-candle.bear .wick { background: rgba(255,255,255,0.6); }
-.daily-candle.bull .body { background: var(--scanner-green); }
-.daily-candle.bear .body { background: var(--scanner-red); }
-.daily-candle.neutral .body { background: var(--panel-alt-bg); }
+/* Use a single variable so both wick and body always match. Use !important to override other rules if needed. */
+.daily-candle .wick,
+.daily-candle .body {
+  background: var(--candle-color) !important;
+}
+.daily-candle.bull { --candle-color: var(--scanner-green); }
+.daily-candle.bear { --candle-color: var(--scanner-red); }
+.daily-candle.neutral { --candle-color: var(--panel-alt-bg); }
 
 /* Mobile notify switch styles */
 .mobile-toggle {
@@ -964,4 +1040,17 @@ button.secondary {
 
   /* Ensure toast is reachable on small screens */
   .toast { right: 8px; left: 8px; top: 12px; }
+
+  /* Mobile: make alert action buttons square for easier tapping */
+  .alert-left .copy-btn,
+  .alerts .delete-btn,
+  .delete-result {
+    width: 48px !important;
+    height: 48px !important;
+    padding: 0 !important;
+    border-radius: 8px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
 }

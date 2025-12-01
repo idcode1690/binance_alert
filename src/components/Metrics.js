@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 
 function formatNumberForDisplay(v) {
   if (typeof v !== 'number' || Number.isNaN(v)) return '—';
@@ -13,8 +13,10 @@ export default function Metrics({ activeSymbol, symbol, lastPrice, lastTick, las
     ? (typeof lastTick !== 'undefined' && lastTick !== null ? formatNumberForDisplay(lastTick) : (lastPrice != null ? formatNumberForDisplay(lastPrice) : '—'))
     : '—';
 
-  // dailyDirection: 'bull' | 'bear' | null
+  // dailyDirection: 'bull' | 'bear' | 'neutral' | null
   const [dailyDirection, setDailyDirection] = useState(null);
+  // Full live daily kline state so we can render wick & body exactly
+  const [dailyKline, setDailyKline] = useState(null); // { o,h,l,c }
 
   // Use Binance futures websocket kline stream for 1d to update daily direction in real-time.
   // We still seed once via REST on mount to avoid visual delay while the socket connects.
@@ -26,6 +28,7 @@ export default function Metrics({ activeSymbol, symbol, lastPrice, lastTick, las
       try {
         if (!symbol || activeSymbol !== symbol) {
           if (mounted) setDailyDirection(null);
+          if (mounted) setDailyKline(null);
           return;
         }
         const sym = (symbol || '').toString().replace(/[^A-Za-z0-9]/g, '').toUpperCase();
@@ -37,9 +40,14 @@ export default function Metrics({ activeSymbol, symbol, lastPrice, lastTick, las
         if (!Array.isArray(data) || data.length === 0) return;
         const last = data[data.length - 1];
         const open = parseFloat(last[1]);
+        const high = parseFloat(last[2]);
+        const low = parseFloat(last[3]);
         const close = parseFloat(last[4]);
         if (Number.isFinite(open) && Number.isFinite(close)) {
           if (mounted) setDailyDirection(close > open ? 'bull' : (close < open ? 'bear' : 'neutral'));
+        }
+        if (Number.isFinite(open) && Number.isFinite(high) && Number.isFinite(low) && Number.isFinite(close)) {
+          if (mounted) setDailyKline({ o: open, h: high, l: low, c: close });
         }
       } catch (e) {
         // ignore
@@ -49,6 +57,7 @@ export default function Metrics({ activeSymbol, symbol, lastPrice, lastTick, las
     // Only operate when this Metrics instance is for the currently-active symbol
     if (!symbol || activeSymbol !== symbol) {
       setDailyDirection(null);
+      setDailyKline(null);
       return () => { mounted = false; };
     }
 
@@ -66,9 +75,14 @@ export default function Metrics({ activeSymbol, symbol, lastPrice, lastTick, las
           const k = payload.k || (payload.data && payload.data.k) || null;
           if (!k) return;
           const o = parseFloat(k.o);
+          const h = parseFloat(k.h);
+          const l = parseFloat(k.l);
           const c = parseFloat(k.c);
           if (!Number.isFinite(o) || !Number.isFinite(c)) return;
           if (mounted) setDailyDirection(c > o ? 'bull' : (c < o ? 'bear' : 'neutral'));
+          if (Number.isFinite(o) && Number.isFinite(h) && Number.isFinite(l) && Number.isFinite(c)) {
+            if (mounted) setDailyKline({ o, h, l, c });
+          }
         } catch (e) {
           // ignore parse errors
         }
@@ -81,6 +95,36 @@ export default function Metrics({ activeSymbol, symbol, lastPrice, lastTick, las
 
     return () => { mounted = false; try { if (ws) ws.close(); } catch (e) {} };
   }, [symbol, activeSymbol]);
+
+  // Compute inline geometry for wick/body based on current dailyKline
+  const candleGeom = useMemo(() => {
+    try {
+      if (!dailyKline) return null;
+      const H = 28; // container height (matches .daily-candle height in CSS)
+      const margin = 2; // top/bottom margin inside the container
+      const inner = Math.max(2, H - margin * 2); // drawable height
+      const { o, h, l, c } = dailyKline;
+      if (!Number.isFinite(h) || !Number.isFinite(l) || h <= l) {
+        // fallback: draw tiny center body
+        return {
+          wick: { top: margin, height: inner },
+          body: { top: Math.round((H - 12) / 2), height: 12 },
+        };
+      }
+      const range = h - l;
+      const scale = inner / range;
+      const bodyHigh = Math.max(o, c);
+      const bodyLow = Math.min(o, c);
+      const wickTop = margin; // full span
+      const wickHeight = Math.max(2, Math.round(range * scale));
+      const bodyHeight = Math.max(2, Math.round((bodyHigh - bodyLow) * scale));
+      const bodyTop = margin + Math.round((h - bodyHigh) * scale);
+      return {
+        wick: { top: wickTop, height: wickHeight },
+        body: { top: bodyTop, height: bodyHeight },
+      };
+    } catch (e) { return null; }
+  }, [dailyKline]);
 
   // sanity-check EMA mapping: ensure provided monitorEma1 < monitorEma2 (short < long)
   useEffect(() => {
@@ -119,8 +163,8 @@ export default function Metrics({ activeSymbol, symbol, lastPrice, lastTick, las
             </div>
             {dailyDirection && (
               <div className={`daily-candle ${dailyDirection}`} title={dailyDirection === 'bull' ? '일봉 상승' : dailyDirection === 'bear' ? '일봉 하락' : '일봉 변동 없음'}>
-                <div className="wick" />
-                <div className="body" />
+                <div className="wick" style={candleGeom ? { top: `${candleGeom.wick.top}px`, height: `${candleGeom.wick.height}px` } : undefined} />
+                <div className="body" style={candleGeom ? { top: `${candleGeom.body.top}px`, height: `${candleGeom.body.height}px` } : undefined} />
               </div>
             )}
           </div>
