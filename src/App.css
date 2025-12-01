@@ -795,6 +795,22 @@ button.secondary {
 /* monitor badge used in alerts header */
 .monitor-badge { font-size: 0.8rem; color: var(--muted-2); background: transparent; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--panel-border); }
 
+/* Daily direction badge shown next to Last price on Metrics */
+.daily-badge {
+  font-size: 0.78rem;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--panel-border);
+  color: var(--muted-2);
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.daily-badge.bull { background: linear-gradient(90deg, var(--scanner-green), #10b981); color: #fff; border-color: transparent; }
+.daily-badge.bear { background: linear-gradient(90deg, var(--scanner-red), #ef4444); color: #fff; border-color: transparent; }
+.daily-badge.neutral { background: var(--panel-alt-bg); color: var(--muted-2); }
+
 /* toast */
 .toast { position: absolute; top: 12px; right: 12px; padding: 8px 12px; border-radius: 6px; z-index: 20000; box-shadow: 0 2px 8px rgba(0,0,0,0.3); color: var(--button-text); }
 .toast.toast-ok { background: rgba(16,185,129,0.9); }

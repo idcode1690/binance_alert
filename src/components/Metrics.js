@@ -79,7 +79,12 @@ export default function Metrics({ activeSymbol, symbol, lastPrice, lastTick, las
             )
           ) : null}
         </div>
-        <div>{displayPrice}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div>{displayPrice}</div>
+          {activeSymbol === symbol && dailyDirection ? (
+            <div className={`daily-badge ${dailyDirection}`}>{`일봉 ${dailyDirection === 'bull' ? '▲' : (dailyDirection === 'bear' ? '▼' : '')}`}</div>
+          ) : null}
+        </div>
       </div>
       <div className="metric"><div className="metric-label">Cross (confirmed)</div><div>{activeSymbol === symbol ? (confirmedCross ?? '—') : '—'}</div></div>
       <div className="metric"><div className="metric-label">{`EMA${monitorEma1}`}</div><div>{activeSymbol === symbol && ema9 ? formatNumberForDisplay(ema9) : '—'}</div></div>
