@@ -858,11 +858,11 @@ button.secondary {
 .mobile-toggle .switch-track {
   width: 44px;
   height: 22px;
-  background: var(--panel-alt-bg);
+  background: var(--muted-3);
   border-radius: 999px;
   position: relative;
   display: inline-block;
-  transition: background 150ms ease;
+  transition: background 160ms ease;
 }
 .mobile-toggle .switch-knob {
   position: absolute;
@@ -872,10 +872,11 @@ button.secondary {
   height: 18px;
   border-radius: 50%;
   background: var(--panel-bg);
-  transition: left 150ms ease, transform 150ms ease;
+  transition: transform 160ms ease, background 160ms ease;
+  will-change: transform;
 }
 .mobile-toggle.active .switch-track { background: var(--scanner-green); }
-.mobile-toggle.active .switch-knob { left: calc(100% - 20px); }
+.mobile-toggle.active .switch-knob { transform: translateX(22px); background: #fff; }
 .mobile-toggle .switch-label { font-size: 13px; color: var(--muted-2); }
 
 /* toast */
