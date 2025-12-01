@@ -687,7 +687,7 @@ function App() {
 
   return (
     <div className={`App ${darkMode ? 'dark' : ''}`}>
-      <TopMenu onNavigate={setView} view={view} darkMode={darkMode} toggleDark={toggleDark} />
+      <TopMenu onNavigate={setView} view={view} darkMode={darkMode} toggleDark={toggleDark} status={status} connected={connected} />
       <div className="container">
         {view === 'scanner' ? (
           <div className="card scanner-full">
@@ -746,9 +746,7 @@ function App() {
               </div>
             )}
 
-            <div className="status" style={{ marginTop: 8 }}>
-              Status: <strong>{status}</strong> {connected ? <span className="status-connected">(connected)</span> : <span className="status-disconnected">(disconnected)</span>}
-            </div>
+            {/* Status moved to TopMenu */}
 
             <Alerts
               events={events}
@@ -839,9 +837,7 @@ function App() {
                   <DebugPanel availableSymbols={availableSymbols} fetchExchangeInfo={fetchExchangeInfo} showDebug={showDebug} setMarketCheckResult={setMarketCheckResult} marketCheckResult={marketCheckResult} symbol={symbol} onSimulateAlert={simulateConfirmedCross} />
                 ) : null}
 
-                <div className="status">
-                  Status: <strong>{status}</strong> {connected ? <span className="status-connected">(connected)</span> : <span className="status-disconnected">(disconnected)</span>}
-                </div>
+                {/* Status moved to TopMenu */}
 
                 <Alerts
                   events={events}
