@@ -156,8 +156,8 @@ export default function Metrics({ activeSymbol, symbol, lastPrice, lastTick, las
             )
           ) : null}
         </div>
-          <div className="last" style={{display: 'flex', alignItems: 'center', justifyContent: 'flex-end'}}>
-            <div style={{textAlign: 'right', marginRight: '8px'}}>
+          <div className="last" style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
+            <div style={{textAlign: 'left', marginRight: '8px'}}>
               <div className="last-label">Last</div>
               <div className="last-value">{displayPrice}</div>
             </div>

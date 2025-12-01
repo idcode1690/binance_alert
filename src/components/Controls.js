@@ -137,6 +137,7 @@ export default function Controls(props) {
       </div>
 
       <div className="scanner-controls">
+        <span className="mobile-alert-label" aria-hidden>Mobile Alert</span>
         {/* Replaced Start/Stop with a single Mobile Notify toggle button. */}
         <MobileNotifyToggle validateSymbolOnce={validateSymbolOnce} symbol={symbol} showToast={props.showToast} />
       </div>

@@ -50,17 +50,27 @@
     align-items: center !important;
     justify-content: center !important;
     gap: 0 !important;
-    width: 28px !important;
-    height: 28px !important;
+    width: 34px !important;
+    height: 18px !important;
+    position: relative !important;
+    border-radius: 999px !important;
   }
   .mobile-toggle .switch-inner { display: none !important; }
-  .mobile-toggle .switch-knob { position: static !important; transform: none !important; width: 14px !important; height: 14px !important; }
-  .mobile-toggle.active .switch-knob { transform: translateX(14px) !important; }
+  .mobile-toggle .switch-knob {
+    position: absolute !important;
+    top: 2px !important;
+    left: 2px !important;
+    width: 14px !important;
+    height: 14px !important;
+    transform: translateX(0) !important;
+  }
+  .mobile-toggle.active .switch-knob { transform: translateX(16px) !important; }
 }
 
 /* Stronger, final mobile overrides for Alerts view toggle */
 @media (max-width: 600px) {
-  .card.main-card .mobile-toggle {
+  .scanner-controls .mobile-toggle {
+    --switch-slide: 16px;
     width: 48px !important;
     height: 48px !important;
     min-width: 48px !important;
@@ -72,16 +82,25 @@
     justify-content: center !important;
     box-sizing: border-box !important;
   }
-  .card.main-card .mobile-toggle .switch-track {
-    width: 28px !important;
-    height: 28px !important;
+  .scanner-controls .mobile-toggle .switch-track {
+    width: 34px !important;
+    height: 18px !important;
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
+    position: relative !important;
+    border-radius: 999px !important;
   }
-  .card.main-card .mobile-toggle .switch-inner { display: none !important; }
-  .card.main-card .mobile-toggle .switch-knob { width: 14px !important; height: 14px !important; position: static !important; transform: none !important; }
-  .card.main-card .mobile-toggle.active .switch-knob { transform: translateX(14px) !important; }
+  .scanner-controls .mobile-toggle .switch-inner { display: none !important; }
+  .scanner-controls .mobile-toggle .switch-knob {
+    width: 14px !important;
+    height: 14px !important;
+    position: absolute !important;
+    top: 2px !important;
+    left: 2px !important;
+    transform: translateX(0) !important;
+  }
+  .scanner-controls .mobile-toggle.active .switch-knob { transform: translateX(var(--switch-slide)) !important; }
 }
 .App {
   font-family: Inter, Roboto, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial;
@@ -732,6 +751,19 @@ button.secondary {
   flex: 0 0 auto;
 }
 
+/* Label shown left of the mobile toggle on Alerts */
+.scanner-controls .mobile-alert-label {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1;
+}
+@media (max-width: 600px) {
+  .scanner-controls .mobile-alert-label {
+    font-size: 13px;
+    color: var(--muted-2);
+  }
+}
+
 /* Make numeric inputs slightly smaller so they fit better on narrow screens */
 .scanner-controls-left input[type="number"] {
   /* slightly narrower numeric inputs to save horizontal space */
@@ -1053,4 +1085,68 @@ button.secondary {
     align-items: center !important;
     justify-content: center !important;
   }
+}
+
+/* Alerts page: square Mobile toggle tile (desktop styles) */
+.scanner-controls .mobile-toggle {
+  --switch-slide: 14px;
+  width: 44px !important;
+  height: 44px !important;
+  min-width: 44px !important;
+  min-height: 44px !important;
+  padding: 0 !important;
+  border-radius: 10px !important;
+  border: 1px solid var(--panel-border) !important;
+  background: var(--card-bg) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+  text-align: center !important;
+}
+.scanner-controls .mobile-toggle .switch-inner { display: none !important; }
+.scanner-controls .mobile-toggle .switch-track {
+  width: 30px !important;
+  height: 18px !important;
+  border-radius: 999px !important;
+  background: var(--panel-border) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  position: relative !important;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.04) !important;
+  transition: background 160ms ease, box-shadow 160ms ease, transform 160ms ease !important;
+}
+.scanner-controls .mobile-toggle .switch-knob {
+  width: 14px !important;
+  height: 14px !important;
+  border-radius: 50% !important;
+  background: #fff !important;
+  border: 1px solid rgba(0,0,0,0.06) !important;
+  position: absolute !important;
+  top: 2px !important;
+  left: 2px !important;
+  transform: translateX(0) !important;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.12) !important;
+}
+.scanner-controls .mobile-toggle.active .switch-track {
+  background: var(--scanner-green) !important;
+  box-shadow: 0 0 0 3px rgba(16,185,129,0.16) inset !important;
+}
+.scanner-controls .mobile-toggle.active .switch-knob { transform: translateX(var(--switch-slide)) !important; }
+.scanner-controls .mobile-toggle:focus-visible {
+  outline: none !important;
+  box-shadow: 0 0 0 4px rgba(16,185,129,0.16) !important;
+}
+.App.dark .scanner-controls .mobile-toggle {
+  border-color: var(--panel-border) !important;
+  background: var(--card-bg) !important;
+}
+.App.dark .scanner-controls .mobile-toggle .switch-track {
+  background: rgba(255,255,255,0.08) !important;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06) !important;
+}
+.App.dark .scanner-controls .mobile-toggle.active .switch-track {
+  background: var(--scanner-green) !important;
+  box-shadow: 0 0 0 3px rgba(16,185,129,0.22) inset !important;
 }
