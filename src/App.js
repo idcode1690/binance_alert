@@ -156,6 +156,11 @@ function App() {
   const hookData = useEmaCross({ symbol, autoConnect: true, debug: showDebug, interval: `${monitorMinutes}m`, emaShort: monitorEma1, emaLong: monitorEma2, confirmClosedCandles: monitorConfirm, klineLimit: 1000 }) || {};
   const { ema9, ema26, lastPrice, lastTick, lastCandleClosed, cross, confirmedCross, confirmedSource, connected, status, connect, disconnect, activeSymbol } = hookData;
 
+  // keep a ref to the latest `connect` returned from the hook so callers
+  // that perform async state updates can always call the freshest function.
+  const connectRef = React.useRef(connect);
+  React.useEffect(() => { connectRef.current = connect; }, [connect]);
+
   
   
   const [events, setEvents] = useState([]);
@@ -387,7 +392,7 @@ function App() {
   const emaLong = (opts && typeof opts.emaLong !== 'undefined') ? opts.emaLong : monitorEma2;
   // confirmCandles retained previously for server sync; now unused after backend removal
     if (!q) {
-      try { connect(sym); } catch (e) {}
+      try { if (connectRef.current) connectRef.current(sym); } catch (e) {}
       return;
     }
     // If caller passed monitoring overrides, commit them to parent state so the
@@ -411,7 +416,7 @@ function App() {
     // allow React to re-render with new monitor values before connecting
     try { await new Promise((r) => setTimeout(r, 120)); } catch (e) {}
 
-    try { connect(q); } catch (e) {}
+    try { if (connectRef.current) connectRef.current(q); } catch (e) {}
     // persist the last-used monitor inputs so Alerts/Controls can restore them
     try {
       const toStore = { monitorMinutes: (typeof interval === 'string' && interval.endsWith('m')) ? Number(interval.replace(/m$/, '')) : Number(interval), monitorEma1: Number(emaShort), monitorEma2: Number(emaLong), lastSymbol: q };
