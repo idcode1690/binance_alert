@@ -174,15 +174,17 @@ input[type="text"] {
 /* allow the symbol input to shrink before numeric inputs collapse */
 .controls .controls-label { flex: 0 1 auto; }
 .controls .controls-label input[type="text"] { 
-  flex: 0 1 80px;
-  min-width: 64px;
-  max-width: 140px;
-  /* match numeric inputs so visual weight is identical */
-  padding: 4px 6px;
-  font-size: 13px;
-  box-sizing: border-box;
-  background: var(--input-bg);
-  border: 1px solid var(--input-border);
+.mobile-toggle .switch-track {
+  width: 96px;
+  height: 26px;
+  background: var(--panel-border);
+  border-radius: 999px;
+  position: relative;
+  display: inline-block;
+  transition: background 160ms ease, box-shadow 160ms ease;
+  overflow: hidden;
+  padding: 0 8px;
+}
   color: var(--text);
   border-radius: 6px;
 }
@@ -504,19 +506,20 @@ button.secondary {
   z-index: 9999;
 }
 .top-menu-bar .menu-btn {
-  padding: 8px 10px;
-  border-radius: 8px;
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--muted-2);
-  cursor: pointer;
+.mobile-toggle .switch-knob {
+  position: absolute;
+  top: 3px;
+  left: 4px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--panel-bg);
+  transition: transform 160ms ease, background 160ms ease;
+  will-change: transform;
+  box-shadow: none;
+  border: 1px solid rgba(0,0,0,0.06);
 }
-.top-menu-bar .menu-btn:hover { background: rgba(0,0,0,0.03); }
-.top-menu-bar .menu-btn.active { background: var(--button-bg); color: var(--button-text); border-color: var(--button-bg); }
-
-.top-menu-bar .menu-btn.theme-toggle { padding: 8px 12px; font-weight: 700; border-radius: 10px; min-width: 96px; }
-.top-menu-bar .menu-btn.theme-toggle.active { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.04); }
-
+.mobile-toggle.active .switch-knob { transform: translateX(calc(100% - 28px)); background: #fff; }
 .loading-text {
   margin-top: 8px;
   color: var(--muted);
@@ -881,6 +884,9 @@ button.secondary {
 .mobile-toggle.active .switch-track { background: var(--scanner-green); }
 .mobile-toggle.active .switch-knob { transform: translateX(22px); background: #fff; }
 .mobile-toggle .switch-label { font-size: 13px; color: var(--text); }
+.mobile-toggle .switch-inner { position: absolute; left: 8px; right: 8px; top: 0; height: 100%; display:flex; align-items:center; justify-content:center; font-size:12px; color: var(--muted-2); pointer-events: none; }
+.mobile-toggle.active .switch-inner { color: #fff; }
+.mobile-toggle:focus-visible .switch-track { box-shadow: 0 0 0 3px rgba(16,185,129,0.12); }
 .mobile-toggle:focus-visible .switch-track { box-shadow: 0 0 0 3px rgba(16,185,129,0.12); }
 
 /* toast */

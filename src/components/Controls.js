@@ -164,11 +164,11 @@ function MobileNotifyToggle({ validateSymbolOnce, symbol, showToast }) {
   };
 
   return (
-    <button type="button" className={`mobile-toggle ${enabled ? 'active' : ''}`} title={enabled ? 'Disable mobile notifications' : 'Enable mobile notifications'} onClick={toggle} aria-pressed={!!enabled}>
+    <button type="button" className={`mobile-toggle ${enabled ? 'active' : ''}`} title={enabled ? 'Disable mobile notifications' : 'Enable mobile notifications'} onClick={toggle} aria-pressed={!!enabled} aria-label={enabled ? 'Mobile notifications on' : 'Mobile notifications off'}>
       <span className="switch-track" aria-hidden>
+        <span className="switch-inner">{enabled ? 'Mobile: ON' : 'Mobile: OFF'}</span>
         <span className="switch-knob" />
       </span>
-      <span className="switch-label">{enabled ? 'Mobile: ON' : 'Mobile: OFF'}</span>
     </button>
   );
 }
