@@ -164,8 +164,11 @@ function MobileNotifyToggle({ validateSymbolOnce, symbol, showToast }) {
   };
 
   return (
-    <button type="button" className={`menu-btn mobile-toggle ${enabled ? 'active' : ''}`} title={enabled ? 'Disable mobile notifications' : 'Enable mobile notifications'} onClick={toggle}>
-      {enabled ? 'Mobile Notify: ON' : 'Mobile Notify: OFF'}
+    <button type="button" className={`mobile-toggle ${enabled ? 'active' : ''}`} title={enabled ? 'Disable mobile notifications' : 'Enable mobile notifications'} onClick={toggle} aria-pressed={!!enabled}>
+      <span className="switch-track" aria-hidden>
+        <span className="switch-knob" />
+      </span>
+      <span className="switch-label">{enabled ? 'Mobile: ON' : 'Mobile: OFF'}</span>
     </button>
   );
 }

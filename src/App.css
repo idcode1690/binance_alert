@@ -842,6 +842,42 @@ button.secondary {
 .daily-candle.bear .body { background: var(--scanner-red); }
 .daily-candle.neutral .body { background: var(--panel-alt-bg); }
 
+/* Mobile notify switch styles */
+.mobile-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  border: none;
+  padding: 4px 6px;
+  cursor: pointer;
+  color: var(--muted-2);
+  font-size: 13px;
+}
+.mobile-toggle:focus { outline: none; }
+.mobile-toggle .switch-track {
+  width: 44px;
+  height: 22px;
+  background: var(--panel-alt-bg);
+  border-radius: 999px;
+  position: relative;
+  display: inline-block;
+  transition: background 150ms ease;
+}
+.mobile-toggle .switch-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--panel-bg);
+  transition: left 150ms ease, transform 150ms ease;
+}
+.mobile-toggle.active .switch-track { background: var(--scanner-green); }
+.mobile-toggle.active .switch-knob { left: calc(100% - 20px); }
+.mobile-toggle .switch-label { font-size: 13px; color: var(--muted-2); }
+
 /* toast */
 .toast { position: absolute; top: 12px; right: 12px; padding: 8px 12px; border-radius: 6px; z-index: 20000; box-shadow: 0 2px 8px rgba(0,0,0,0.3); color: var(--button-text); }
 .toast.toast-ok { background: rgba(16,185,129,0.9); }
