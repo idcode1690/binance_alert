@@ -137,32 +137,36 @@ export default function Controls(props) {
       </div>
 
       <div className="scanner-controls">
-        {/* Confirm 입력폼 제거됨 (monitorConfirm은 내부 로직만 유지) */}
-
-        <button disabled={!(symbolValid === true) || status === 'reloading'} title={!(symbolValid === true) ? '유효한 심볼을 입력하세요' : (status === 'reloading' ? '초기화 중...' : 'Start')} onClick={async () => {
-        const ok = await validateSymbolOnce(symbol);
-        if (!ok) { setSymbolValid(false); return; }
-        setSymbolValid(true);
-        // commit any local input values before connecting
-        const mins = parseInt(minsStr, 10);
-        const ema1 = parseInt(ema1Str, 10);
-        const ema2 = parseInt(ema2Str, 10);
-        if (Number.isFinite(mins) && mins > 0) setMonitorMinutes(mins);
-        if (Number.isFinite(ema1) && ema1 > 0) setMonitorEma1(ema1);
-        if (Number.isFinite(ema2) && ema2 > 0) setMonitorEma2(ema2);
-        // pass monitoring options to connect (App will accept and forward to server)
-        try {
-          connect(symbol, { interval: mins > 0 ? mins : monitorMinutes, emaShort: ema1 > 0 ? ema1 : monitorEma1, emaLong: ema2 > 0 ? ema2 : monitorEma2 });
-        } catch (e) {
-          connect(symbol);
-        }
-      }}>Start</button>
-
-        <button className="secondary" onClick={() => disconnect()}>Stop</button>
-
+        {/* Replaced Start/Stop with a single Mobile Notify toggle button. */}
+        <MobileNotifyToggle validateSymbolOnce={validateSymbolOnce} symbol={symbol} showToast={props.showToast} />
       </div>
 
     </div>
+  );
+}
+
+function MobileNotifyToggle({ validateSymbolOnce, symbol, showToast }) {
+  const [enabled, setEnabled] = React.useState(() => {
+    try {
+      const raw = localStorage.getItem('mobileNotifyEnabled');
+      if (raw === null) return true; // default ON
+      return raw === 'true';
+    } catch (e) { return true; }
+  });
+
+  const toggle = async () => {
+    const next = !enabled;
+    try {
+      localStorage.setItem('mobileNotifyEnabled', next ? 'true' : 'false');
+    } catch (e) {}
+    setEnabled(next);
+    try { if (showToast) showToast(`Mobile notifications ${next ? 'enabled' : 'disabled'}`); } catch (e) {}
+  };
+
+  return (
+    <button type="button" className={`menu-btn mobile-toggle ${enabled ? 'active' : ''}`} title={enabled ? 'Disable mobile notifications' : 'Enable mobile notifications'} onClick={toggle}>
+      {enabled ? 'Mobile Notify: ON' : 'Mobile Notify: OFF'}
+    </button>
   );
 }
 
