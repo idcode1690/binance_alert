@@ -811,6 +811,37 @@ button.secondary {
 .daily-badge.bear { background: linear-gradient(90deg, var(--scanner-red), #ef4444); color: #fff; border-color: transparent; }
 .daily-badge.neutral { background: var(--panel-alt-bg); color: var(--muted-2); }
 
+/* compact candle visualization for daily direction badge */
+.daily-candle {
+  width: 26px;
+  height: 18px;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.daily-candle .wick {
+  position: absolute;
+  width: 2px;
+  height: 16px;
+  background: var(--muted-2);
+  border-radius: 1px;
+  top: 1px;
+}
+.daily-candle .body {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  top: 4px;
+  box-shadow: 0 1px 0 rgba(0,0,0,0.06) inset;
+}
+.daily-candle.bull .wick { background: rgba(255,255,255,0.6); }
+.daily-candle.bear .wick { background: rgba(255,255,255,0.6); }
+.daily-candle.bull .body { background: linear-gradient(90deg, var(--scanner-green), #10b981); border: 1px solid rgba(255,255,255,0.08); }
+.daily-candle.bear .body { background: linear-gradient(90deg, var(--scanner-red), #ef4444); border: 1px solid rgba(255,255,255,0.06); }
+.daily-candle.neutral .body { background: var(--panel-alt-bg); border: 1px solid var(--panel-border); }
+
 /* toast */
 .toast { position: absolute; top: 12px; right: 12px; padding: 8px 12px; border-radius: 6px; z-index: 20000; box-shadow: 0 2px 8px rgba(0,0,0,0.3); color: var(--button-text); }
 .toast.toast-ok { background: rgba(16,185,129,0.9); }
