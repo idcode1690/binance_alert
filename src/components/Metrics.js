@@ -16,10 +16,13 @@ export default function Metrics({ activeSymbol, symbol, lastPrice, lastTick, las
   // dailyDirection: 'bull' | 'bear' | null
   const [dailyDirection, setDailyDirection] = useState(null);
 
-  // Fetch the last 1d candle for the active symbol to determine daily direction
+  // Use Binance futures websocket kline stream for 1d to update daily direction in real-time.
+  // We still seed once via REST on mount to avoid visual delay while the socket connects.
   useEffect(() => {
     let mounted = true;
-    async function fetchDaily() {
+    let ws = null;
+
+    async function fetchDailyOnce() {
       try {
         if (!symbol || activeSymbol !== symbol) {
           if (mounted) setDailyDirection(null);
@@ -32,7 +35,6 @@ export default function Metrics({ activeSymbol, symbol, lastPrice, lastTick, las
         if (!res.ok) return;
         const data = await res.json();
         if (!Array.isArray(data) || data.length === 0) return;
-        // Use the last closed daily candle (last element)
         const last = data[data.length - 1];
         const open = parseFloat(last[1]);
         const close = parseFloat(last[4]);
@@ -40,13 +42,44 @@ export default function Metrics({ activeSymbol, symbol, lastPrice, lastTick, las
           if (mounted) setDailyDirection(close > open ? 'bull' : (close < open ? 'bear' : 'neutral'));
         }
       } catch (e) {
-        // ignore fetch errors
+        // ignore
       }
     }
-    fetchDaily();
-    // refresh daily direction every 5 minutes while the component is mounted
-    const t = setInterval(fetchDaily, 5 * 60 * 1000);
-    return () => { mounted = false; clearInterval(t); };
+
+    // Only operate when this Metrics instance is for the currently-active symbol
+    if (!symbol || activeSymbol !== symbol) {
+      setDailyDirection(null);
+      return () => { mounted = false; };
+    }
+
+    // seed current state once
+    fetchDailyOnce();
+
+    try {
+      const stream = `${(symbol || '').toString().replace(/[^A-Za-z0-9]/g, '').toLowerCase()}@kline_1d`;
+      const url = `wss://fstream.binance.com/ws/${stream}`;
+      ws = new WebSocket(url);
+      ws.onmessage = (ev) => {
+        try {
+          const payload = JSON.parse(ev.data);
+          // payload may be { e: 'kline', k: {...} } or { stream, data }
+          const k = payload.k || (payload.data && payload.data.k) || null;
+          if (!k) return;
+          const o = parseFloat(k.o);
+          const c = parseFloat(k.c);
+          if (!Number.isFinite(o) || !Number.isFinite(c)) return;
+          if (mounted) setDailyDirection(c > o ? 'bull' : (c < o ? 'bear' : 'neutral'));
+        } catch (e) {
+          // ignore parse errors
+        }
+      };
+      ws.onerror = () => {};
+      ws.onclose = () => {};
+    } catch (e) {
+      // ignore websocket init errors; we already seeded via REST
+    }
+
+    return () => { mounted = false; try { if (ws) ws.close(); } catch (e) {} };
   }, [symbol, activeSymbol]);
 
   // sanity-check EMA mapping: ensure provided monitorEma1 < monitorEma2 (short < long)
