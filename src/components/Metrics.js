@@ -82,7 +82,7 @@ export default function Metrics({ activeSymbol, symbol, lastPrice, lastTick, las
           <div className="last" style={{display: 'flex', alignItems: 'center', justifyContent: 'flex-end'}}>
             <div style={{textAlign: 'right', marginRight: '8px'}}>
               <div className="last-label">Last</div>
-              <div className="last-value">{formatPrice(last)}</div>
+              <div className="last-value">{displayPrice}</div>
             </div>
             {dailyDirection && (
               <div className={`daily-candle ${dailyDirection}`} title={dailyDirection === 'bull' ? '일봉 상승' : dailyDirection === 'bear' ? '일봉 하락' : '일봉 변동 없음'}>
