@@ -30,6 +30,7 @@ export default function TradesBox({ symbol }) {
           const t = {
             id: data.t,
             price: Number(data.p),
+            priceStr: typeof data.p === 'string' ? data.p : String(data.p), // show exact Binance precision
             qty: Number(data.q),
             ts: data.T,
             isBuyerMaker: !!data.m,
@@ -77,7 +78,7 @@ export default function TradesBox({ symbol }) {
           trades.map((t) => (
             <div key={t.id} className={`trade-row ${t.isBuyerMaker ? 'sell' : 'buy'}`}>
               <div className="trade-left">
-                <span className="trade-price">{fmtNum(t.price)}</span>
+                <span className="trade-price">{t.priceStr}</span>
                 <span className="trade-sep">·</span>
                 <span className="trade-qty">{formatQty(t.qty)}</span>
               </div>
