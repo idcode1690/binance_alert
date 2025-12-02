@@ -417,7 +417,11 @@ const scannerManager = (() => {
         workerInstance = null;
       }
     } catch (e) {}
-    running = false; currentSymbol = null; scanStartTime = null; scanType = null; notifyThrottled(true);
+    // Fully clear runtime state so UI reflects a hard stop
+    running = false; currentSymbol = null; scanStartTime = null; scanType = null;
+    try { progress = { done: 0, total: 0 }; } catch (e) {}
+    try { activeMatches = {}; } catch (e) {}
+    notifyThrottled(true);
   }
   function getState() { return stateSnapshot(); }
   function removeResult(id) { if (!id) return; results = results.filter(r => r.id !== id); notifyThrottled(); }

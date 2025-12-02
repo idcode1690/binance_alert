@@ -23,16 +23,19 @@ export default function TradesBox({ symbol }) {
     try {
       const sym = (symbol || '').toString().replace(/[^A-Za-z0-9]/g, '').toLowerCase();
       if (!sym) return;
-      const url = `wss://stream.binance.com:9443/ws/${sym}@trade`;
+      // Use Binance USD-M futures stream for consistency with the app
+      const url = `wss://fstream.binance.com/ws/${sym}@trade`;
       const ws = new WebSocket(url);
       wsRef.current = ws;
       ws.onmessage = (ev) => {
         try {
-          const data = JSON.parse(ev.data);
+          const raw = JSON.parse(ev.data);
+          const data = raw && raw.data ? raw.data : raw; // support combined stream shape
+          if (!data || typeof data.t === 'undefined' || typeof data.p === 'undefined') return;
           const t = {
             id: data.t,
             price: Number(data.p),
-            priceStr: typeof data.p === 'string' ? data.p : String(data.p), // show exact Binance precision
+            priceStr: typeof data.p === 'string' ? data.p : String(data.p),
             qty: Number(data.q),
             ts: data.T,
             isBuyerMaker: !!data.m,
