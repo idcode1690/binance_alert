@@ -134,6 +134,19 @@
   --scanner-stop: #6b7280;
   --panel-alt-bg: #f8fafc;
   --muted-2: #334155;
+  /* trade box sizing: exactly 5 rows visible */
+  --trades-visible-rows: 4; /* reduced from 5 to show one fewer row */
+  --trade-row-height: 18px; /* single row (text + vertical breathing) */
+  --trade-row-gap: 6px; /* gap between rows (see .trades-list gap) */
+  --trades-box-padding-y: 20px; /* trades-box has 10px top + 10px bottom padding */
+  /* Height formula: rows + gaps + vertical padding
+     rows: trade-row-height * visible-rows
+     gaps: trade-row-gap * (visible-rows - 1)
+     padding: trades-box-padding-y
+     calc supports var * var where second is unitless (visible-rows) */
+  --trades-box-height: calc(var(--trade-row-height) * var(--trades-visible-rows)
+    + var(--trade-row-gap) * (var(--trades-visible-rows) - 1)
+    + var(--trades-box-padding-y));
 }
 
 .App.dark {
@@ -358,7 +371,77 @@ button.secondary {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 8px;
-  margin-top: 12px;
+  margin-top: 0; /* normalize top margin so left group aligns with trades box */
+}
+.metrics-compact {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  max-width: 420px; /* reduce overall width of metric grid */
+}
+.alerts-metrics-row {
+  display: grid;
+  grid-template-columns: minmax(320px, auto) 0.8fr; /* narrow right trades panel */
+  gap: 12px;
+  align-items: stretch; /* stretch children to equal heights */
+}
+.metrics-right { min-width: 0; min-height: 0; height: 100%; align-self: stretch; }
+.metrics-left { height: 100%; }
+.metrics-left { height: 100%; }
+.trades-box {
+  background: var(--panel-alt-bg);
+  padding: 10px; /* match left metric padding */
+  border-radius: 6px; /* match left metric radius */
+  border: 1px solid var(--panel-border);
+  box-shadow: none; /* match left metric (no shadow) */
+  /* fixed height: prevent growth when content increases */
+  height: var(--trades-box-height); /* computed for exactly 5 rows */
+  flex: 0 0 var(--trades-box-height);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* prevent box from expanding due to children */
+}
+.trades-header { display: none; }
+.trades-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1 1 0; /* consume remaining space within fixed-height box */
+  min-height: 0; /* allow this flex child to scroll instead of growing parent */
+  overflow: auto; /* allow scrolling within fixed-height box */
+}
+
+/* Hide scrollbars in trades list (cross-browser) */
+.trades-list::-webkit-scrollbar { display: none; }
+.trades-list { -ms-overflow-style: none; scrollbar-width: none; }
+.trade-row { display: flex; gap: var(--trade-row-gap); font-size: 12px; align-items: center; min-height: var(--trade-row-height); }
+.trade-price { font-weight: 700; }
+.trade-qty { color: var(--muted); }
+.trade-sep { color: var(--muted); }
+.trade-left { display: flex; gap: 6px; align-items: center; }
+.trade-row { justify-content: space-between; }
+.trade-time { font-size: 11px; color: var(--muted); flex-shrink: 0; }
+.trade-row.buy .trade-price { color: var(--scanner-green); }
+.trade-row.sell .trade-price { color: var(--scanner-red); }
+.trades-empty { font-size: 12px; color: var(--muted); }
+
+/* New vertical trade block layout */
+.trade-block {
+  display: flex;
+  flex-direction: column;
+  padding: 2px 0;
+  font-size: 12px;
+  line-height: 1.2;
+  border-bottom: 1px solid var(--panel-border);
+}
+.trade-block:last-child { border-bottom: none; }
+.trade-price-line { font-weight: 700; }
+.trade-block.buy .trade-price-line { color: var(--scanner-green); }
+.trade-block.sell .trade-price-line { color: var(--scanner-red); }
+.trade-qty-line { color: var(--muted-2); font-size: 11px; }
+.trade-time-line { color: var(--muted); font-size: 11px; }
+
+@media (max-width: 600px) {
+  .alerts-metrics-row { grid-template-columns: 1fr; }
+  .metrics-compact { max-width: 100%; }
 }
 
 .metric {

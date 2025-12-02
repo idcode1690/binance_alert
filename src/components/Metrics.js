@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import TradesBox from './TradesBox';
 
 function formatNumberForDisplay(v) {
   if (typeof v !== 'number' || Number.isNaN(v)) return '—';
@@ -143,9 +144,12 @@ export default function Metrics({ activeSymbol, symbol, lastPrice, lastTick, las
 
   const liveBadgeClass = lastCandleClosed ? 'badge closed' : `badge open ${dailyDirection === 'bull' ? 'live-bull' : (dailyDirection === 'bear' ? 'live-bear' : '')}`;
 
+  // 고정 높이 트레이드 박스를 사용하므로 좌우 동적 높이 동기화 로직 제거
+
   return (
-    <div className="metrics">
-      <div className="metric">
+    <div className="alerts-metrics-row">
+      <div className="metrics metrics-compact">
+        <div className="metric">
         <div className="metric-label">
           <span>Last price</span>
           {activeSymbol === symbol ? (
@@ -168,10 +172,14 @@ export default function Metrics({ activeSymbol, symbol, lastPrice, lastTick, las
               </div>
             )}
           </div>
+        </div>
+        <div className="metric"><div className="metric-label">Cross (confirmed)</div><div>{activeSymbol === symbol ? (confirmedCross ?? '—') : '—'}</div></div>
+        <div className="metric"><div className="metric-label">{`EMA${monitorEma1}`}</div><div>{activeSymbol === symbol && ema9 ? formatNumberForDisplay(ema9) : '—'}</div></div>
+        <div className="metric"><div className="metric-label">{`EMA${monitorEma2}`}</div><div>{activeSymbol === symbol && ema26 ? formatNumberForDisplay(ema26) : '—'}</div></div>
       </div>
-      <div className="metric"><div className="metric-label">Cross (confirmed)</div><div>{activeSymbol === symbol ? (confirmedCross ?? '—') : '—'}</div></div>
-      <div className="metric"><div className="metric-label">{`EMA${monitorEma1}`}</div><div>{activeSymbol === symbol && ema9 ? formatNumberForDisplay(ema9) : '—'}</div></div>
-      <div className="metric"><div className="metric-label">{`EMA${monitorEma2}`}</div><div>{activeSymbol === symbol && ema26 ? formatNumberForDisplay(ema26) : '—'}</div></div>
+      <div className="metrics-right">
+        <TradesBox symbol={symbol} />
+      </div>
     </div>
   );
 }
