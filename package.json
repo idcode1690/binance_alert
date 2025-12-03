@@ -20,7 +20,7 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "pages:deploy:github": "npm run build && powershell -NoProfile -Command \"Remove-Item -Recurse -Force docs; New-Item -ItemType Directory -Path docs | Out-Null; Copy-Item -Recurse -Force build/* docs/;\"",
+    "pages:deploy:github": "npm run build && powershell -NoProfile -Command \"Remove-Item -Recurse -Force docs; New-Item -ItemType Directory -Path docs | Out-Null; Copy-Item -Recurse -Force build/* docs/; New-Item -ItemType File -Path docs/.nojekyll -Force | Out-Null;\"",
     "test:telegram": "node scripts/test_telegram.js",
     "health": "node -e \"(async()=>{const u=(process.env.WORKER_URL||'https://binance-alert.idcode1690.workers.dev').replace(/\\\\\\/$/,'');const r=await fetch(u+'/health');console.log(await r.text())})()\"",
     "pages:dev": "wrangler pages dev ./build",
