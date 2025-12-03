@@ -120,7 +120,6 @@ function formatQty(q) {
   if (typeof q !== 'number' || Number.isNaN(q)) return '—';
   if (q >= 1_000_000) return (q / 1_000_000).toFixed(2) + 'M';
   if (q >= 1_000) return (q / 1_000).toFixed(2) + 'K';
-  if (q >= 100) return q.toFixed(2);
-  if (q >= 1) return q.toFixed(2);
-  return q.toFixed(4);
+  // Below 1k: show with thousand separators and 2 decimals for consistency
+  try { return new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(q); } catch (e) { return q.toFixed(2); }
 }
