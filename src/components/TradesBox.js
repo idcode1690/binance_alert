@@ -37,6 +37,7 @@ export default function TradesBox({ symbol }) {
             price: Number(data.p),
             priceStr: typeof data.p === 'string' ? data.p : String(data.p),
             qty: Number(data.q),
+            notional: Number(data.p) * Number(data.q),
             ts: data.T,
             isBuyerMaker: !!data.m,
           };
@@ -104,7 +105,7 @@ export default function TradesBox({ symbol }) {
               <div className="trade-left">
                 <span className="trade-price">{formatPrice(t.price)}</span>
                 <span className="trade-sep">·</span>
-                <span className="trade-qty">{formatQty(t.qty)}</span>
+                <span className="trade-qty">{formatNotional(t.notional)}</span>
               </div>
               <span className="trade-time" title="Trade time (local)">{fmtTime(t.ts)}</span>
             </div>
@@ -116,10 +117,10 @@ export default function TradesBox({ symbol }) {
 }
 
 // Quantity formatter extracted outside component (pure)
-function formatQty(q) {
-  if (typeof q !== 'number' || Number.isNaN(q)) return '—';
-  if (q >= 1_000_000) return (q / 1_000_000).toFixed(2) + 'M';
-  if (q >= 1_000) return (q / 1_000).toFixed(2) + 'K';
-  // Below 1k: show with thousand separators and 2 decimals for consistency
-  try { return new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(q); } catch (e) { return q.toFixed(2); }
+// Format notional (quote asset, e.g., USDT) similar to Binance trade size display
+function formatNotional(v) {
+  if (typeof v !== 'number' || Number.isNaN(v)) return '—';
+  if (v >= 1_000_000) return (v / 1_000_000).toFixed(2) + 'M';
+  if (v >= 1_000) return (v / 1_000).toFixed(2) + 'K';
+  try { return new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v); } catch (e) { return v.toFixed(2); }
 }
