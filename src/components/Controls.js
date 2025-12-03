@@ -39,6 +39,7 @@ export default function Controls(props) {
   const [ema2Str, setEma2Str] = useState(String(monitorEma2 ?? ''));
   // Confirm 입력 UI 제거: 부모 상태는 다른 컴포넌트/알림 로직에서만 사용됨.
   void monitorConfirm;
+  const commitTimersRef = useRef({ ema1: null, ema2: null });
 
   // keep local strings in sync if parent updates (e.g., persisted restore)
   useEffect(() => { setMinsStr(String(monitorMinutes ?? '')); }, [monitorMinutes]);
@@ -120,20 +121,60 @@ export default function Controls(props) {
 
         <label className="control-inline-label">
           <span className="label-text">EMA1</span>
-          <input className="ema-input" size="5" style={{width: '5ch'}} type="number" min="1" value={ema1Str} onChange={(e) => { setEma1Str(e.target.value); }} onBlur={() => {
-          const p = parseInt(ema1Str, 10);
-          if (!Number.isFinite(p) || p <= 0) return;
-          setMonitorEma1(p);
-        }} />
+          <input
+            className="ema-input"
+            size="5"
+            style={{ width: '5ch' }}
+            type="number"
+            min="1"
+            value={ema1Str}
+            onChange={(e) => {
+              const v = e.target.value;
+              setEma1Str(v);
+              try {
+                if (commitTimersRef.current.ema1) clearTimeout(commitTimersRef.current.ema1);
+                commitTimersRef.current.ema1 = setTimeout(() => {
+                  const p = parseInt(v, 10);
+                  if (!Number.isFinite(p) || p <= 0) return;
+                  setMonitorEma1(p);
+                }, 600);
+              } catch (err) {}
+            }}
+            onBlur={() => {
+              const p = parseInt(ema1Str, 10);
+              if (!Number.isFinite(p) || p <= 0) return;
+              setMonitorEma1(p);
+            }}
+          />
         </label>
 
         <label className="control-inline-label">
           <span className="label-text">EMA2</span>
-          <input className="ema-input" size="5" style={{width: '5ch'}} type="number" min="1" value={ema2Str} onChange={(e) => { setEma2Str(e.target.value); }} onBlur={() => {
-          const p = parseInt(ema2Str, 10);
-          if (!Number.isFinite(p) || p <= 0) return;
-          setMonitorEma2(p);
-        }} />
+          <input
+            className="ema-input"
+            size="5"
+            style={{ width: '5ch' }}
+            type="number"
+            min="1"
+            value={ema2Str}
+            onChange={(e) => {
+              const v = e.target.value;
+              setEma2Str(v);
+              try {
+                if (commitTimersRef.current.ema2) clearTimeout(commitTimersRef.current.ema2);
+                commitTimersRef.current.ema2 = setTimeout(() => {
+                  const p = parseInt(v, 10);
+                  if (!Number.isFinite(p) || p <= 0) return;
+                  setMonitorEma2(p);
+                }, 600);
+              } catch (err) {}
+            }}
+            onBlur={() => {
+              const p = parseInt(ema2Str, 10);
+              if (!Number.isFinite(p) || p <= 0) return;
+              setMonitorEma2(p);
+            }}
+          />
         </label>
       </div>
 
