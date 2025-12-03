@@ -4,12 +4,16 @@ compatibility_date = "2025-08-16"
 
 workers_dev = true
 
+[vars]
+# Disable scheduled scanning unless explicitly enabled in Cloudflare dashboard
+SCAN_ENABLED = "false"
+
 [triggers]
-# 기본 5분 간격으로 실행 (원하면 */1 * * * * 로 1분 간격도 가능)
+# 기본 5분 간격. SCAN_ENABLED=false이면 코드는 즉시 return 하므로 발송되지 않습니다.
 crons = ["*/5 * * * *"]
 
-[[kv_namespaces]]
-binding = "KV_SCAN"
-# KV namespace removed to allow deploying when no KV is configured.
-# If you need persistence, create a KV namespace in Cloudflare and add the section back
-#+ with the proper `id` and `preview_id` values.
+# No KV namespace by default. Add one when enabling scans:
+# [[kv_namespaces]]
+# binding = "KV_SCAN"
+# id = "<YOUR_KV_NAMESPACE_ID>"
+# preview_id = "<YOUR_KV_PREVIEW_ID>"
