@@ -48,6 +48,7 @@ export default function useEmaCross({ symbol = 'BTCUSDT', autoConnect = true, de
   const currentSymbolRef = useRef(null);
   const lastProcessedCloseRef = useRef(null); // timestamp (ms) of last processed closed candle
   const pollingTimerRef = useRef(null);
+  const prevConfigRef = useRef({ interval, emaShort, emaLong });
 
   // Normalize interval strings for Binance API compatibility.
   // Binance accepts tokens like '1m','3m','5m','15m','30m','1h','2h','4h', etc.
@@ -135,6 +136,8 @@ export default function useEmaCross({ symbol = 'BTCUSDT', autoConnect = true, de
       console.error(err);
     }
   }, [symbol, interval, emaShort, emaLong, debug, klineLimit]);
+
+  
 
   const connect = useCallback(async (overrideSymbol) => {
     const targetSymbol = (overrideSymbol || symbol).toString();
@@ -522,6 +525,29 @@ export default function useEmaCross({ symbol = 'BTCUSDT', autoConnect = true, de
       currentSymbolRef.current = null;
     };
   }, [symbol, fetchAndInit, debug, interval, emaShort, emaLong, confirmClosedCandles]);
+
+  // React to configuration changes (interval/EMA periods): reinitialize and reconnect
+  useEffect(() => {
+    try {
+      const prev = prevConfigRef.current || {};
+      const changed = prev.interval !== interval || prev.emaShort !== emaShort || prev.emaLong !== emaLong;
+      prevConfigRef.current = { interval, emaShort, emaLong };
+      if (!changed) return;
+      if (!activeSymbol || !currentSymbolRef.current) return;
+      setStatus('reloading');
+      try {
+        const ws = wsRef.current;
+        if (ws) { ws.__replaced = true; try { ws.close(); } catch (e) {} }
+      } catch (e) {}
+      candidateConfirmedRef.current = null;
+      candidateCountRef.current = 0;
+      lastProcessedCloseRef.current = null;
+      (async () => {
+        try { await fetchAndInit(currentSymbolRef.current); } catch (e) {}
+        try { await connect(currentSymbolRef.current); } catch (e) {}
+      })();
+    } catch (e) {}
+  }, [interval, emaShort, emaLong, activeSymbol, connect, fetchAndInit]);
 
   const disconnect = useCallback(() => {
     if (wsRef.current) {
