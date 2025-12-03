@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { sendTelegramMessage } from '../utils/telegram';
+// telegram sending is handled by App-level flow after alert list updates
 import { calculateInitialEMA, updateEMA } from '../utils/ema';
 
 // Hook options: { symbol }
