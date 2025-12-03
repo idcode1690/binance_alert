@@ -28,6 +28,18 @@
     <!-- deploy-bump: 2025-12-02T00:00:00Z -->
   </head>
   <body>
+    <script>
+      // Configure Worker endpoint for GitHub Pages
+      (function(){
+        try {
+          var url = 'https://binance-alert.idcode1690.workers.dev';
+          if (url && !/\/$/.test(url)) url += '';
+          // Expose as process.env-like shim for frontend util
+          window.process = window.process || {};
+          window.process.env = Object.assign({}, window.process.env || {}, { WORKER_URL: url });
+        } catch (e) {}
+      })();
+    </script>
     <noscript>You need to enable JavaScript to run this app.</noscript>
     <div id="root"></div>
     <!--
