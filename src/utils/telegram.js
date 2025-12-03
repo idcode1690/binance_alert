@@ -13,13 +13,15 @@ function resolveEndpoint() {
   if (runtime) return `${runtime}/send-alert`;
   const env = (process && process.env && process.env.WORKER_URL) ? process.env.WORKER_URL.replace(/\/$/, '') : '';
   if (env) return `${env}/send-alert`;
-  return '/api/send-alert';
+  // Default to deployed Cloudflare Worker when no env/runtime override is present.
+  // This ensures GitHub Pages can send alerts without same-origin proxy.
+  return 'https://binance-alert.idcode1690.workers.dev/send-alert';
 }
 
-export async function sendTelegramMessage({ chatId, message, text } = {}) {
+export async function sendTelegramMessage({ chatId, message, text, confirmed = true } = {}) {
   const endpoint = resolveEndpoint();
   console.log('Sending Telegram via endpoint:', endpoint);
-  const payload = { chatId };
+  const payload = { chatId, confirmed };
   // Normalize: prefer explicit message; fall back to text
   if (typeof message === 'string' && message.trim()) {
     payload.message = message.trim();

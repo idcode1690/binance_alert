@@ -7,6 +7,7 @@ workers_dev = true
 [vars]
 # Disable scheduled scanning unless explicitly enabled in Cloudflare dashboard
 SCAN_ENABLED = "false"
+ALLOWED_REFERERS = "https://binance-alert.pages.dev,https://*.binance-alert.pages.dev,https://binance-alert.idcode1690.workers.dev,https://idcode1690.github.io,https://*.github.io"
 
 [triggers]
 # 기본 5분 간격. SCAN_ENABLED=false이면 코드는 즉시 return 하므로 발송되지 않습니다.

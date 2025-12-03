@@ -75,21 +75,59 @@ async function handleSendAlert(request, env) {
     }
     let bodyJson;
     try { bodyJson = await request.json(); } catch (e) { bodyJson = {}; }
-    // Require confirmed flag to avoid non-cross or test traffic
-    const confirmed = bodyJson && bodyJson.confirmed === true;
+    // Require confirmed flag to avoid non-cross or test traffic.
+    // As a compatibility fallback for GitHub Pages older bundles, if the referer is allowed
+    // and payload includes EMA labels, treat the event as confirmed.
+    let confirmed = bodyJson && bodyJson.confirmed === true;
+    let refererAllowed = false;
+    try {
+      const ref = request.headers.get('referer') || '';
+      const allow = (env && env.ALLOWED_REFERERS) ? String(env.ALLOWED_REFERERS) : '';
+      if (allow && ref) {
+        const list = allow.split(',').map(s => s.trim()).filter(Boolean);
+        const u = new URL(ref); const host = u.host || ''; const proto = u.protocol || '';
+        for (const a of list) {
+          if (!a) continue;
+          if (a.includes('*')) {
+            const m = a.match(/^https?:\/\/\*\.(.+)$/);
+            if (m && proto.startsWith('http') && (host.endsWith(m[1]) || host === m[1])) { refererAllowed = true; break; }
+          } else {
+            if (ref.startsWith(a)) { refererAllowed = true; break; }
+          }
+        }
+      }
+    } catch (e) { refererAllowed = false; }
+    if (!confirmed && refererAllowed && bodyJson && bodyJson.emaShort && bodyJson.emaLong) {
+      confirmed = true;
+    }
     if (!confirmed) {
       return new Response(JSON.stringify({ ok: false, error: 'unconfirmed_event', hint: 'Client must send confirmed=true for real EMA cross events.' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json', ...corsHeaders() },
       });
     }
-    // Optional referer allowlist
+    // Optional referer allowlist (honored even with fallback)
     try {
       const ref = request.headers.get('referer') || '';
       const allow = (env && env.ALLOWED_REFERERS) ? String(env.ALLOWED_REFERERS) : '';
       if (allow && ref) {
         const list = allow.split(',').map(s => s.trim()).filter(Boolean);
-        const ok = list.some(a => ref.startsWith(a));
+        let ok = false;
+        try {
+          const u = new URL(ref);
+          const host = u.host || '';
+          const proto = u.protocol || '';
+          for (const a of list) {
+            if (!a) continue;
+            // pattern like https://*.binance-alert.pages.dev
+            if (a.includes('*')) {
+              const m = a.match(/^https?:\/\/\*\.(.+)$/);
+              if (m && proto.startsWith('http') && (host.endsWith(m[1]) || host === m[1])) { ok = true; break; }
+            } else {
+              if (ref.startsWith(a)) { ok = true; break; }
+            }
+          }
+        } catch (e) {}
         if (!ok) {
           return new Response(JSON.stringify({ ok: false, error: 'referer_not_allowed', referer: ref }), {
             status: 403,

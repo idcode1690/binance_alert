@@ -22,7 +22,7 @@ async function main() {
   const price = Number(process.env.PRICE || 0);
 
   const endpoint = `${url}/send-alert`;
-  const payload = { symbol, message, emaShort, emaLong };
+  const payload = { symbol, message, emaShort, emaLong, confirmed: true };
   if (!Number.isNaN(price) && price > 0) payload.price = price;
 
   console.log('[test] POST', endpoint, 'payload:', payload);

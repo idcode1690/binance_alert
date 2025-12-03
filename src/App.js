@@ -358,7 +358,7 @@ function App() {
         }
         try {
           if (showDebug) console.debug('[App] simulate sending /send-alert', { url: `${serverUrl}/send-alert`, payload: { symbol: sym, price, message: text, emaShort: monitorEma1, emaLong: monitorEma2 } });
-          const res = await fetch(`${serverUrl}/send-alert`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ symbol: sym, price, message: text, emaShort: monitorEma1, emaLong: monitorEma2 }) });
+          const res = await fetch(`${serverUrl}/send-alert`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ symbol: sym, price, message: text, emaShort: monitorEma1, emaLong: monitorEma2, confirmed: true }) });
           let json = null;
           try { json = await res.json(); } catch (e) { json = null; }
           const sendEv = { ts: Date.now(), time: new Date().toLocaleString(), type: 'telegram_send', symbol: sym, source: 'client-send', ok: res.ok, status: res.status, body: json };

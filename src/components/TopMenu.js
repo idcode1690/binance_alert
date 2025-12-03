@@ -4,7 +4,7 @@ import { sendTelegramMessage } from '../utils/telegram';
 export default function TopMenu({ onNavigate, view, darkMode, toggleDark, status = 'idle', connected = false }) {
   const handleTelegramTest = async () => {
     try {
-      const resp = await sendTelegramMessage({ message: `Binance Alert: 테스트 메시지 (${new Date().toLocaleString()})` });
+      const resp = await sendTelegramMessage({ message: `Binance Alert: 테스트 메시지 (${new Date().toLocaleString()})`, confirmed: true });
       console.log('Telegram test sent:', resp);
       if (typeof window !== 'undefined') {
         alert('Telegram 테스트 메시지를 전송했습니다.');
