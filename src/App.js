@@ -154,7 +154,7 @@ function App() {
   // Disable hook autoConnect: App will control connecting so we can update server monitor symbol first
   // Guard against unexpected undefined return (e.g., faulty Jest mock) to keep tests stable.
   const hookData = useEmaCross({ symbol, autoConnect: true, debug: showDebug, interval: `${monitorMinutes}m`, emaShort: monitorEma1, emaLong: monitorEma2, confirmClosedCandles: monitorConfirm, klineLimit: 1000 }) || {};
-  const { ema9, ema26, lastPrice, lastTick, lastCandleClosed, cross, confirmedCross, confirmedSource, connected, status, connect, disconnect, activeSymbol } = hookData;
+  const { ema9, ema26, lastPrice, lastTick, lastCandleClosed, cross, confirmedCross, confirmedIsActualCross, confirmedSource, connected, status, connect, disconnect, activeSymbol } = hookData;
 
   // keep a ref to the latest `connect` returned from the hook so callers
   // that perform async state updates can always call the freshest function.
@@ -565,10 +565,20 @@ function App() {
         lastNotified.current = confirmedCross; // seed only
         return;
       }
+      // If this first event is not an actual crossing, seed and skip.
+      if (!confirmedIsActualCross) {
+        lastNotified.current = confirmedCross;
+        return;
+      }
       // fall through to notify logic below
     }
 
     if (lastNotified.current !== confirmedCross) {
+      // Only notify/send when a real crossing event occurred.
+      if (!confirmedIsActualCross) {
+        lastNotified.current = confirmedCross;
+        return;
+      }
   const type = confirmedCross === 'bull' ? `Bullish EMA${monitorEma1} > EMA${monitorEma2}` : `Bearish EMA${monitorEma1} < EMA${monitorEma2}`;
       const symToShowRaw = activeSymbol || symbol || '';
       const symToShow = (symToShowRaw || '').toString().replace(/[^A-Za-z0-9]/g, '').toUpperCase();
@@ -611,7 +621,7 @@ function App() {
           return;
         }
         // payload는 evObj 기반으로 구성
-        const payload = { symbol: evObj.symbol, price: (typeof priceToUse==='number'?priceToUse:evObj.price), message: type + ' @ ' + (typeof priceToUse==='number'?priceToUse:evObj.price), emaShort: monitorEma1, emaLong: monitorEma2 };
+        const payload = { symbol: evObj.symbol, price: (typeof priceToUse==='number'?priceToUse:evObj.price), message: type + ' @ ' + (typeof priceToUse==='number'?priceToUse:evObj.price), emaShort: monitorEma1, emaLong: monitorEma2, confirmed: true };
         try { if (showDebug) console.debug('[App] confirmedCross preparing /send-alert after event add', { serverUrl, payload }); } catch (e) {}
         const maxAttempts = 3; let attempt = 0; let lastError = null;
         while (attempt < maxAttempts) {
@@ -631,7 +641,7 @@ function App() {
       })();
       lastNotified.current = confirmedCross;
     }
-  }, [confirmedCross, lastPrice, lastTick, symbol, activeSymbol, confirmedSource, showDebug, addEvent, showToast, ema9, ema26, serverUrl, monitorEma1, monitorEma2, monitorConfirm]);
+  }, [confirmedCross, confirmedIsActualCross, lastPrice, lastTick, symbol, activeSymbol, confirmedSource, showDebug, addEvent, showToast, ema9, ema26, serverUrl, monitorEma1, monitorEma2, monitorConfirm]);
 
   // 심볼이 바뀔 때 이전 심볼의 알림 상태가 남아 있어 잘못된 알림이 뜨는 문제 방지
   // 심볼을 변경하면 lastNotified를 초기화해서 다음 confirmedCross는 초기 시드로 처리되도록 한다.

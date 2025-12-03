@@ -26,6 +26,7 @@ export default function useEmaCross({ symbol = 'BTCUSDT', autoConnect = true, de
   }, [lastTick, debug]);
   const [cross, setCross] = useState(null); // preview (live) cross
   const [confirmedCross, setConfirmedCross] = useState(null); // only updated on closed candles (confirmed)
+  const [confirmedIsActualCross, setConfirmedIsActualCross] = useState(false); // true only when a sign-change (real cross) occurred
   const [confirmedSource, setConfirmedSource] = useState(null); // 'ws' | 'poll' | 'init'
   const [connected, setConnected] = useState(false);
   const [status, setStatus] = useState('idle');
@@ -128,6 +129,7 @@ export default function useEmaCross({ symbol = 'BTCUSDT', autoConnect = true, de
   prevConfirmedRef.current = initialCross;
   setConfirmedCross(initialCross);
   setConfirmedSource('init');
+  setConfirmedIsActualCross(false);
     } catch (err) {
       setStatus(`init error: ${err.message}`);
       console.error(err);
@@ -351,6 +353,7 @@ export default function useEmaCross({ symbol = 'BTCUSDT', autoConnect = true, de
                       prevConfirmedRef.current = candidate;
                       setConfirmedCross(candidate);
                       setConfirmedSource('ws');
+                      setConfirmedIsActualCross(Boolean(detectedCross));
                       // also update public `cross` so UI reflects the closed-candle decision
                       if (prevCrossRef.current !== candidate) {
                         prevCrossRef.current = candidate;
@@ -373,6 +376,7 @@ export default function useEmaCross({ symbol = 'BTCUSDT', autoConnect = true, de
                 prevConfirmedRef.current = fallback;
                 setConfirmedCross(fallback);
                 setConfirmedSource('ws');
+                setConfirmedIsActualCross(false);
               }
             }
           } else {
@@ -475,6 +479,7 @@ export default function useEmaCross({ symbol = 'BTCUSDT', autoConnect = true, de
                         prevConfirmedRef.current = detectedCross;
                         setConfirmedCross(detectedCross);
                         setConfirmedSource('poll');
+                        setConfirmedIsActualCross(true);
                         if (prevCrossRef.current !== detectedCross) {
                           prevCrossRef.current = detectedCross;
                           setCross(detectedCross);
@@ -526,6 +531,7 @@ export default function useEmaCross({ symbol = 'BTCUSDT', autoConnect = true, de
     setConnected(false);
     setStatus('disconnected');
     setActiveSymbol(null);
+    try { setConfirmedIsActualCross(false); } catch (e) {}
     if (pollingTimerRef.current) {
       clearInterval(pollingTimerRef.current);
       pollingTimerRef.current = null;
@@ -570,6 +576,7 @@ export default function useEmaCross({ symbol = 'BTCUSDT', autoConnect = true, de
       setLastPrice(null);
       setCross(null);
       setConfirmedCross(null);
+      setConfirmedIsActualCross(false);
       setLastCandleClosed(false);
       // Set status to reloading while we fetch/init for the new symbol; do NOT set connected=false here,
       // so the UI remains 'connected' until the replacement socket opens (smoother UX).
@@ -609,6 +616,7 @@ export default function useEmaCross({ symbol = 'BTCUSDT', autoConnect = true, de
     lastCandleClosed,
     cross,
     confirmedCross,
+    confirmedIsActualCross,
     confirmedSource,
     connected,
     status,

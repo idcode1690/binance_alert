@@ -10,6 +10,15 @@
 // 필요 환경변수: TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
 // KV 바인딩: KV_SCAN (설정/상태 저장용)
 // CORS: allow cross-origin from any for simplicity (can restrict later).
+// Simple in-memory dedupe cache to prevent rapid duplicate sends (resets on new Worker instance)
+const __DEDUPE_CACHE = new Map();
+function dedupeCheck(key, ttlMs = 30000) {
+  const now = Date.now();
+  const hit = __DEDUPE_CACHE.get(key);
+  if (hit && hit > now) return true;
+  __DEDUPE_CACHE.set(key, now + ttlMs);
+  return false;
+}
 
 function corsHeaders() {
   return {
@@ -66,6 +75,29 @@ async function handleSendAlert(request, env) {
     }
     let bodyJson;
     try { bodyJson = await request.json(); } catch (e) { bodyJson = {}; }
+    // Require confirmed flag to avoid non-cross or test traffic
+    const confirmed = bodyJson && bodyJson.confirmed === true;
+    if (!confirmed) {
+      return new Response(JSON.stringify({ ok: false, error: 'unconfirmed_event', hint: 'Client must send confirmed=true for real EMA cross events.' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders() },
+      });
+    }
+    // Optional referer allowlist
+    try {
+      const ref = request.headers.get('referer') || '';
+      const allow = (env && env.ALLOWED_REFERERS) ? String(env.ALLOWED_REFERERS) : '';
+      if (allow && ref) {
+        const list = allow.split(',').map(s => s.trim()).filter(Boolean);
+        const ok = list.some(a => ref.startsWith(a));
+        if (!ok) {
+          return new Response(JSON.stringify({ ok: false, error: 'referer_not_allowed', referer: ref }), {
+            status: 403,
+            headers: { 'Content-Type': 'application/json', ...corsHeaders() },
+          });
+        }
+      }
+    } catch (e) {}
     const symbol = (bodyJson.symbol || '').toString().toUpperCase();
     const price = typeof bodyJson.price !== 'undefined' ? bodyJson.price : '';
     const emaShort = bodyJson.emaShort || '';
@@ -91,7 +123,7 @@ async function handleSendAlert(request, env) {
     try {
       const ua = request.headers.get('user-agent') || '';
       const ref = request.headers.get('referer') || '';
-      const safe = { ev: 'send-alert', ts: Date.now(), symbol, text, ua, ref };
+      const safe = { ev: 'send-alert', ts: Date.now(), symbol, text, ua, ref, confirmed: true };
       console.log(JSON.stringify(safe));
     } catch (e) {}
 
@@ -99,6 +131,14 @@ async function handleSendAlert(request, env) {
     const useToken = bodyJson.token ? String(bodyJson.token) : botToken;
     const base = `https://api.telegram.org/bot${useToken}/sendMessage`;
     const url = `${base}?chat_id=${encodeURIComponent(chatId)}&text=${encodeURIComponent(text)}`;
+
+    // Dedupe within 30s by chatId+text to avoid duplicates
+    const dedupeKey = `${String(chatId)}|${text}`;
+    if (dedupeCheck(dedupeKey, 30000)) {
+      return new Response(JSON.stringify({ ok: true, skippedDuplicate: true, sent: null }), {
+        status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders() },
+      });
+    }
 
     // Retry with small backoff on transient errors
     const maxRetries = 2;
