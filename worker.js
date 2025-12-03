@@ -191,6 +191,10 @@ async function sendTelegram(env, text) {
 }
 
 async function runScanOnce(env, overrides = {}) {
+  // Hard guard: Do not send from scheduled/scan when KV is not bound or scanning is disabled.
+  const scanEnabled = String((env && env.SCAN_ENABLED) || '').toLowerCase() === 'true';
+  const kvAvailable = !!(env && env.KV_SCAN);
+  const allowSends = scanEnabled && kvAvailable;
   // Load stored config and merge overrides (overrides come from client form / API)
   const storedCfg = await loadConfig(env);
   const cfg = { ...storedCfg, ...(overrides || {}) };
@@ -243,8 +247,10 @@ async function runScanOnce(env, overrides = {}) {
         // cooldown guard
         if (now - lastTs < cooldownMs) continue;
         const msg = (t === 'golden' ? '[골든]' : '[데드]') + ` ${sym} ${interval} EMA${emaShort}/${emaLong} @ ${new Date().toLocaleString('ko-KR')}`;
-        const sent = await sendTelegram(env, msg);
-        if (sent && sent.ok) { lastMap[key] = now; }
+        if (allowSends) {
+          const sent = await sendTelegram(env, msg);
+          if (sent && sent.ok) { lastMap[key] = now; }
+        }
         matches.push({ symbol: sym, type: t, interval, emaShort, emaLong, time: new Date().toISOString() });
       }
     }
@@ -263,8 +269,8 @@ async function runScanOnce(env, overrides = {}) {
     state.scannedCount = scannedCount;
     state.newMatches = matches.length;
     await saveState(env, state);
-    await saveLastCross(env, lastMap);
-    return { ok: true, count: matches.length };
+    if (kvAvailable) await saveLastCross(env, lastMap);
+    return { ok: true, count: matches.length, sends: allowSends ? 'sent-if-match' : 'disabled' };
   } catch (err) {
     state.lastRun = Date.now(); state.lastError = String(err);
     state.lastScanDuration = Date.now() - startTime;
@@ -352,7 +358,10 @@ const workerExport = {
   },
   // Cloudflare Scheduled (cron) handler: 상시 스캔 수행
   async scheduled(controller, env, ctx) {
-    // 간단 보호: 텔레그램 미설정 시 스킵
+    // 보호: 스캔 비활성화이거나 KV 미연결, 텔레그램 미설정 시 스킵
+    const scanEnabled = String((env && env.SCAN_ENABLED) || '').toLowerCase() === 'true';
+    if (!scanEnabled) return;
+    if (!env.KV_SCAN) return;
     if (!env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_CHAT_ID) return;
     const res = await runScanOnce(env);
     // 선택적으로 로깅

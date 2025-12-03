@@ -3,7 +3,7 @@ import { sendTelegramMessage } from '../utils/telegram';
 import { calculateInitialEMA, updateEMA } from '../utils/ema';
 
 // Hook options: { symbol }
-export default function useEmaCross({ symbol = 'BTCUSDT', autoConnect = true, debug = false, interval = '1m', emaShort = 9, emaLong = 26, confirmClosedCandles = 1, klineLimit = 1000, autoSendTelegram = true } = {}) {
+export default function useEmaCross({ symbol = 'BTCUSDT', autoConnect = true, debug = false, interval = '1m', emaShort = 9, emaLong = 26, confirmClosedCandles = 1, klineLimit = 1000, autoSendTelegram = false } = {}) {
   const [ema9, setEma9] = useState(null);
   const [ema26, setEma26] = useState(null);
   const [lastPrice, setLastPrice] = useState(null);
@@ -598,42 +598,8 @@ export default function useEmaCross({ symbol = 'BTCUSDT', autoConnect = true, de
 
   // Auto-send Telegram only once per confirmed cross event on a closed candle.
   // Debounce by symbol/interval/EMA pair and closed candle time to avoid duplicates.
-  const lastSentKeyRef = useRef(null);
-  const lastSentAtRef = useRef(0);
-  useEffect(() => {
-    try {
-      if (!autoSendTelegram) return;
-      const s = (activeSymbol || symbol || '').toString().replace(/[^A-Za-z0-9]/g, '').toUpperCase();
-      if (!s) return;
-      // require: a confirmed cross decided from ws/poll AND the candle is closed
-      if (!confirmedCross || !lastCandleClosed) return;
-      if (confirmedSource !== 'ws' && confirmedSource !== 'poll') return;
-
-      // use last processed close time as part of the debounce key
-      const closeTs = lastProcessedCloseRef.current || 0;
-      const key = `${s}|${interval}|EMA${emaShort}/${emaLong}|${closeTs}|${confirmedCross}`;
-      const now = Date.now();
-      const minGapMs = 30 * 1000; // 30s safety gap
-
-      // only send when key changes (new closed candle cross) and outside min gap
-      const isNewEvent = lastSentKeyRef.current !== key;
-      const gapOk = (now - (lastSentAtRef.current || 0)) >= minGapMs;
-      if (!isNewEvent || !gapOk) return;
-
-      const priceNum = (typeof lastPrice === 'number' ? lastPrice : (typeof lastTick === 'number' ? lastTick : null));
-      if (priceNum == null) return;
-      const tag = `EMA${emaShort}/${emaLong}`;
-      const ts = new Date(closeTs || now).toISOString().replace('T', ' ').replace('Z', ' UTC');
-      const msg = `${confirmedCross === 'bull' ? '[골든]' : '[데드]'} ${s} ${interval} ${tag} | ${priceNum.toFixed(2)} | ${ts} | Frontend`;
-
-      sendTelegramMessage({ text: msg })
-        .catch(() => {})
-        .finally(() => {
-          lastSentKeyRef.current = key;
-          lastSentAtRef.current = now;
-        });
-    } catch (e) {}
-  }, [confirmedCross, confirmedSource, lastCandleClosed, activeSymbol, symbol, interval, emaShort, emaLong, autoSendTelegram, lastPrice, lastTick]);
+  // Disable hook-level auto Telegram sending to ensure messages only fire
+  // when the UI alert list actually records a cross (handled in App.js).
 
   return {
     ema9,
