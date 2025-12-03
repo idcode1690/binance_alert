@@ -55,49 +55,64 @@ async function handlePrice(url) {
 
 async function handleSendAlert(request, env) {
   try {
-    const botToken = env && env.TELEGRAM_BOT_TOKEN ? String(env.TELEGRAM_BOT_TOKEN) : '';
-    const chatId = env && env.TELEGRAM_CHAT_ID ? String(env.TELEGRAM_CHAT_ID) : '';
-    if (!botToken || !chatId) {
+    // Allow overriding token via request body for diagnostics
+    const botToken = (env && env.TELEGRAM_BOT_TOKEN ? String(env.TELEGRAM_BOT_TOKEN) : '');
+    const envChat = env && env.TELEGRAM_CHAT_ID ? String(env.TELEGRAM_CHAT_ID) : '';
+    if (!botToken || !envChat) {
       return new Response(JSON.stringify({ ok: false, error: 'telegram_not_configured' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json', ...corsHeaders() },
       });
     }
     let bodyJson;
-    try { bodyJson = await request.json(); } catch (e) {
-      return new Response(JSON.stringify({ ok: false, error: 'invalid_json' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders() },
-      });
-    }
+    try { bodyJson = await request.json(); } catch (e) { bodyJson = {}; }
     const symbol = (bodyJson.symbol || '').toString().toUpperCase();
     const price = typeof bodyJson.price !== 'undefined' ? bodyJson.price : '';
     const emaShort = bodyJson.emaShort || '';
     const emaLong = bodyJson.emaLong || '';
-    const tag = emaShort && emaLong ? `EMA${emaShort}/${emaLong}` : 'EMA';
-    const msgBase = bodyJson.message || 'Alert';
-    const text = [symbol, msgBase, price ? `@ ${price}` : '', tag].filter(Boolean).join(' ');
+    const tag = emaShort && emaLong ? `EMA${emaShort}/${emaLong}` : '';
+    const msgBase = (bodyJson.message || 'Alert').toString();
+    // keep text simple to avoid encoding issues
+    const parts = [msgBase, symbol, price ? `@ ${price}` : '', tag].filter(Boolean);
+    const text = parts.join(' ').trim();
 
-    const tgResp = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: chatId, text }),
-    });
-    const result = await tgResp.json().catch(() => null);
-    if (!tgResp.ok) {
-      return new Response(JSON.stringify({ ok: false, error: 'telegram_api_failed', status: tgResp.status, detail: result, hint: 'Check TELEGRAM_BOT_TOKEN/CHAT_ID and that the bot has access to the chat. Try /health.' }), {
-        status: 502,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders() },
-      });
+    // Normalize chat_id: use numeric if possible
+    // Prefer chatId from request body if provided (for testing), else envChat
+    let chatId = typeof bodyJson.chatId !== 'undefined' && bodyJson.chatId !== null ? String(bodyJson.chatId) : envChat;
+    const n = Number(chatId);
+    if (!Number.isNaN(n) && String(n) === String(chatId)) chatId = n;
+
+    // Workaround: Some environments see 404 with JSON POST; try GET with query params
+    const useToken = bodyJson.token ? String(bodyJson.token) : botToken;
+    const base = `https://api.telegram.org/bot${useToken}/sendMessage`;
+    const url = `${base}?chat_id=${encodeURIComponent(chatId)}&text=${encodeURIComponent(text)}`;
+
+    // Retry with small backoff on transient errors
+    const maxRetries = 2;
+    let attempt = 0;
+    let last = null;
+    while (attempt <= maxRetries) {
+      const tgResp = await fetch(url, { method: 'GET' });
+      const result = await tgResp.json().catch(() => null);
+      if (tgResp.ok && result && result.ok) {
+        return new Response(JSON.stringify({ ok: true, sent: text, telegram: result }), {
+          status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders() },
+        });
+      }
+      last = { status: tgResp.status, detail: result, url };
+      if (tgResp.status >= 500 || tgResp.status === 429) {
+        // backoff
+        await new Promise(r => setTimeout(r, 300 * (attempt + 1)));
+        attempt += 1; continue;
+      }
+      break;
     }
-    return new Response(JSON.stringify({ ok: true, sent: text, telegram: result }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders() },
+    return new Response(JSON.stringify({ ok: false, error: 'telegram_api_failed', ...last, hint: 'Verify chat_id and bot permissions. Try direct API with same payload.' }), {
+      status: 502, headers: { 'Content-Type': 'application/json', ...corsHeaders() },
     });
   } catch (err) {
-    return new Response(JSON.stringify({ ok: false, error: 'telegram_exception', detail: String(err), hint: 'Network blocked or invalid token/chat id. Validate with Telegram test in UI.' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders() },
+    return new Response(JSON.stringify({ ok: false, error: 'telegram_exception', detail: String(err) }), {
+      status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders() },
     });
   }
 }
