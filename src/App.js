@@ -89,8 +89,8 @@ function App() {
         if (parsed && typeof parsed.monitorConfirm !== 'undefined') return Number(parsed.monitorConfirm) || 1;
       }
     } catch (e) {}
-    // increase default confirmation to 2 closed candles to reduce false positives
-    return 2;
+    // default confirmation: 1 closed candle for faster additions
+    return 1;
   });
   const [marketCheckResult, setMarketCheckResult] = useState(null);
   // helper to fetch exchangeInfo and populate availableSymbols
