@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { sendTelegramMessage } from '../utils/telegram';
-import React, { useState } from 'react';
+// Telegram test handled in TopMenu; no local button here
 
 export default function Alerts({ events = [], removeAlertByTs, symbol, monitorMinutes, monitorEma1, monitorEma2 }) {
   const normTarget = (symbol || '').toString().replace(/[^A-Za-z0-9]/g, '').toUpperCase();
@@ -16,39 +15,6 @@ export default function Alerts({ events = [], removeAlertByTs, symbol, monitorMi
       return false;
     }
   });
-    const [error, setError] = useState(null);
-    const [chatId, setChatId] = useState('');
-    const [text, setText] = useState('');
-    const [status, setStatus] = useState(null);
-
-    const onSend = async () => {
-      setError(null);
-      setStatus('sending');
-      try {
-        const resp = await sendTelegramMessage({ chatId, text });
-        setStatus('sent');
-      } catch (e) {
-        setStatus(null);
-        setError(e.message);
-      }
-    };
-
-    return (
-      <div className="Alerts">
-        <h3>Telegram Alerts</h3>
-        <div>
-          <label>Chat ID</label>
-          <input value={chatId} onChange={(e)=>setChatId(e.target.value)} placeholder="@username or numeric id" />
-        </div>
-        <div>
-          <label>Message</label>
-          <input value={text} onChange={(e)=>setText(e.target.value)} placeholder="Enter message" />
-        </div>
-        <button onClick={onSend} disabled={!chatId || !text || status==='sending'}>Send</button>
-        {status && <div className="status">{status}</div>}
-        {error && <div className="error">{error}</div>}
-      </div>
-    );
 
   const [copiedSymbol, setCopiedSymbol] = useState(null);
 
@@ -69,15 +35,17 @@ export default function Alerts({ events = [], removeAlertByTs, symbol, monitorMi
     } catch (e) {}
   };
 
-  if (!visible || visible.length === 0) return null;
-
   return (
     <div className="alerts">
-      <div style={{display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'space-between'}}>
-        <div style={{display:'flex', alignItems:'center', gap:8}}>
-          <div className="alerts-title">Alerts</div>
-          <div className="monitor-badge">{`${monitorMinutes}m · EMA${monitorEma1}/${monitorEma2}`}</div>
-        </div>
+      {(!visible || visible.length === 0) ? (
+        <div className="alerts-empty" style={{color:'var(--muted-2)'}}>No alerts yet.</div>
+      ) : (
+      <div>
+        <div style={{display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'space-between'}}>
+          <div style={{display:'flex', alignItems:'center', gap:8}}>
+            <div className="alerts-title">Alerts</div>
+            <div className="monitor-badge">{`${monitorMinutes}m · EMA${monitorEma1}/${monitorEma2}`}</div>
+          </div>
       </div>
 
       <ul className="alerts-list">
@@ -104,6 +72,8 @@ export default function Alerts({ events = [], removeAlertByTs, symbol, monitorMi
           </li>
         ))}
       </ul>
+        </div>
+      )}
     </div>
   );
 }
