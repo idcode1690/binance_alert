@@ -71,10 +71,15 @@ async function handleSendAlert(request, env) {
     const emaShort = bodyJson.emaShort || '';
     const emaLong = bodyJson.emaLong || '';
     const tag = emaShort && emaLong ? `EMA${emaShort}/${emaLong}` : '';
-    const msgBase = (bodyJson.message || 'Alert').toString();
-    // keep text simple to avoid encoding issues
-    const parts = [msgBase, symbol, price ? `@ ${price}` : '', tag].filter(Boolean);
-    const text = parts.join(' ').trim();
+    // Accept either 'text' (final string) or 'message' (base string).
+    let text = '';
+    if (typeof bodyJson.text === 'string' && bodyJson.text.trim()) {
+      text = bodyJson.text.trim();
+    } else {
+      const msgBase = (bodyJson.message || 'Alert').toString();
+      const parts = [msgBase, symbol, price ? `@ ${price}` : '', tag].filter(Boolean);
+      text = parts.join(' ').trim();
+    }
 
     // Normalize chat_id: use numeric if possible
     // Prefer chatId from request body if provided (for testing), else envChat
