@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { sendTelegramMessage } from '../utils/telegram';
 import { calculateInitialEMA, updateEMA } from '../utils/ema';
 
 // Hook options: { symbol }
-export default function useEmaCross({ symbol = 'BTCUSDT', autoConnect = true, debug = false, interval = '1m', emaShort = 9, emaLong = 26, confirmClosedCandles = 1, klineLimit = 1000 } = {}) {
+export default function useEmaCross({ symbol = 'BTCUSDT', autoConnect = true, debug = false, interval = '1m', emaShort = 9, emaLong = 26, confirmClosedCandles = 1, klineLimit = 1000, autoSendTelegram = true } = {}) {
   const [ema9, setEma9] = useState(null);
   const [ema26, setEma26] = useState(null);
   const [lastPrice, setLastPrice] = useState(null);
@@ -594,6 +595,21 @@ export default function useEmaCross({ symbol = 'BTCUSDT', autoConnect = true, de
     }
     // only run when status or autoConnect changes
   }, [status, autoConnect, connect]);
+
+  // Auto-send Telegram on confirmed cross (no UX needed)
+  useEffect(() => {
+    try {
+      if (!autoSendTelegram) return;
+      const s = (activeSymbol || symbol || '').toString().replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+      if (!s) return;
+      if (confirmedCross && lastCandleClosed) {
+        const tag = `EMA${emaShort}/${emaLong}`;
+        const msg = `${confirmedCross === 'bull' ? '[골든]' : '[데드]'} ${s} ${interval} ${tag}`;
+        // worker uses env chat id if chatId omitted
+        sendTelegramMessage({ text: msg }).catch(() => {});
+      }
+    } catch (e) {}
+  }, [confirmedCross, lastCandleClosed, activeSymbol, symbol, interval, emaShort, emaLong, autoSendTelegram]);
 
   return {
     ema9,
