@@ -82,6 +82,14 @@ async function handleSendAlert(request, env) {
     const n = Number(chatId);
     if (!Number.isNaN(n) && String(n) === String(chatId)) chatId = n;
 
+    // Simple audit log (no secrets)
+    try {
+      const ua = request.headers.get('user-agent') || '';
+      const ref = request.headers.get('referer') || '';
+      const safe = { ev: 'send-alert', ts: Date.now(), symbol, text, ua, ref };
+      console.log(JSON.stringify(safe));
+    } catch (e) {}
+
     // Workaround: Some environments see 404 with JSON POST; try GET with query params
     const useToken = bodyJson.token ? String(bodyJson.token) : botToken;
     const base = `https://api.telegram.org/bot${useToken}/sendMessage`;
