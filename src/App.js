@@ -589,57 +589,6 @@ function App() {
         }
         const body = `${symToShow} ${type} @ ${priceToUse}`;
 
-      // Also request the server to send a Telegram message for this confirmed cross.
-      // In static/client-only mode (no serverUrl) skip server relay and show a toast.
-      (async () => {
-        if (!serverUrl) {
-          try { showToast('Telegram disabled: no server configured', false); } catch (e) {}
-          if (showDebug) console.debug('[App] confirmedCross skipped POST /send-alert because serverUrl is not set');
-          return;
-        }
-        // preflight debug
-        try { if (showDebug) console.debug('[App] confirmedCross preparing /send-alert', { serverUrl, payloadPreview: { symbol: symToShow, price: priceToUse } }); } catch (e) {}
-  const payload = { symbol: symToShow, price: priceToUse, message: type + ' @ ' + priceToUse, emaShort: monitorEma1, emaLong: monitorEma2 };
-        // debug: log state used for send-alert so we can trace mismatched alerts
-        try {
-          console.log('[App] sending /send-alert', { sendSym: symToShow, selectedSymbol: symbol, activeSymbol, confirmedCross, confirmedSource, ema9, ema26, lastPrice, lastTick });
-        } catch (e) {}
-        // also show a brief UI toast with the same debug info so it's visible without DevTools
-        try {
-          const dbg = `${symToShow} ${confirmedCross} | active:${activeSymbol || '—'} | ema:${(typeof ema9==='number'?ema9.toFixed(4):'—')}/${(typeof ema26==='number'?ema26.toFixed(4):'—')} | price:${(typeof lastPrice!=='undefined'&&lastPrice!==null)?lastPrice:'—'}`;
-          try { showToast(`[DEBUG] ${dbg}`, true); } catch (e) { console.log('[App] showToast debug failed', e); }
-        } catch (e) {}
-        const maxAttempts = 3;
-        let attempt = 0;
-        let lastError = null;
-        while (attempt < maxAttempts) {
-          attempt += 1;
-          try {
-            if (showDebug) console.debug('[App] confirmedCross sending /send-alert attempt', attempt, payload);
-            const res = await fetch(`${serverUrl}/send-alert`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(payload),
-            });
-            let json = null;
-            try { json = await res.json(); } catch (e) { json = null; }
-            const sendEv = { ts: Date.now(), time: new Date().toLocaleString(), type: 'telegram_send', symbol: symToShow, source: 'client-confirmed', ok: res.ok, status: res.status, body: json, attempt };
-            try { addEvent(sendEv); } catch (e) { setEvents((prev) => [sendEv, ...prev].slice(0, 500)); }
-            try { showToast(res.ok ? `Telegram send OK (${symToShow})` : `Telegram send failed (${res.status})`, res.ok); } catch (e) {}
-            if (res.ok) break; // success
-            lastError = new Error(`HTTP ${res.status}`);
-          } catch (e) {
-            lastError = e;
-            if (showDebug) console.debug('[App] confirmedCross send attempt failed', attempt, e);
-          }
-          // exponential backoff before retrying
-          if (attempt < maxAttempts) {
-            const delay = 500 * Math.pow(2, attempt - 1); // 500ms, 1000ms
-            await new Promise((r) => setTimeout(r, delay));
-          }
-        }
-        if (lastError && showDebug) console.debug('[App] confirmedCross final send error', lastError);
-      })();
 
       // browser notification
       if ('Notification' in window && Notification.permission === 'granted') {
@@ -654,6 +603,32 @@ function App() {
       const evObj = { ts: Date.now(), time: new Date().toLocaleString(), type: confirmedCross, price: lastPrice, symbol: symToShow, source: confirmedSource || 'unknown' };
       if (showDebug) console.debug('[App] created confirmedCross event', evObj);
       setEvents((s) => [evObj, ...s].slice(0, 500));
+      // 서버 텔레그램 발송은 실제 알림 리스트에 항목이 추가된 이후에만 수행
+      (async () => {
+        if (!serverUrl) {
+          try { showToast('Telegram disabled: no server configured', false); } catch (e) {}
+          if (showDebug) console.debug('[App] confirmedCross skipped POST /send-alert because serverUrl is not set');
+          return;
+        }
+        // payload는 evObj 기반으로 구성
+        const payload = { symbol: evObj.symbol, price: (typeof priceToUse==='number'?priceToUse:evObj.price), message: type + ' @ ' + (typeof priceToUse==='number'?priceToUse:evObj.price), emaShort: monitorEma1, emaLong: monitorEma2 };
+        try { if (showDebug) console.debug('[App] confirmedCross preparing /send-alert after event add', { serverUrl, payload }); } catch (e) {}
+        const maxAttempts = 3; let attempt = 0; let lastError = null;
+        while (attempt < maxAttempts) {
+          attempt += 1;
+          try {
+            const res = await fetch(`${serverUrl}/send-alert`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            let json = null; try { json = await res.json(); } catch (e) { json = null; }
+            const sendEv = { ts: Date.now(), time: new Date().toLocaleString(), type: 'telegram_send', symbol: evObj.symbol, source: 'client-confirmed', ok: res.ok, status: res.status, body: json, attempt };
+            try { addEvent(sendEv); } catch (e) { setEvents((prev) => [sendEv, ...prev].slice(0, 500)); }
+            try { showToast(res.ok ? `Telegram send OK (${evObj.symbol})` : `Telegram send failed (${res.status})`, res.ok); } catch (e) {}
+            if (res.ok) break;
+            lastError = new Error(`HTTP ${res.status}`);
+          } catch (e) { lastError = e; if (showDebug) console.debug('[App] confirmedCross send attempt failed', attempt, e); }
+          if (attempt < maxAttempts) { const delay = 500 * Math.pow(2, attempt - 1); await new Promise((r) => setTimeout(r, delay)); }
+        }
+        if (lastError && showDebug) console.debug('[App] confirmedCross final send error', lastError);
+      })();
       lastNotified.current = confirmedCross;
     }
   }, [confirmedCross, lastPrice, lastTick, symbol, activeSymbol, confirmedSource, showDebug, addEvent, showToast, ema9, ema26, serverUrl, monitorEma1, monitorEma2, monitorConfirm]);
