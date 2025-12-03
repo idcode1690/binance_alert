@@ -97,11 +97,20 @@ async function handleSendAlert(request, env) {
         }
       }
     } catch (e) { refererAllowed = false; }
-    if (!confirmed && refererAllowed && bodyJson && bodyJson.emaShort && bodyJson.emaLong) {
-      confirmed = true;
+    if (!confirmed && refererAllowed && bodyJson) {
+      // Fallback A: EMA labels present
+      if (bodyJson.emaShort && bodyJson.emaLong) {
+        confirmed = true;
+      } else {
+        // Fallback B: Known client test button format
+        const m = (bodyJson.message || bodyJson.text || '').toString();
+        if (m.startsWith('Binance Alert:')) {
+          confirmed = true;
+        }
+      }
     }
     if (!confirmed) {
-      return new Response(JSON.stringify({ ok: false, error: 'unconfirmed_event', hint: 'Client must send confirmed=true for real EMA cross events.' }), {
+      return new Response(JSON.stringify({ ok: false, error: 'unconfirmed_event', hint: 'Client must send confirmed=true for real EMA cross events.', received: { hasConfirmed: bodyJson && bodyJson.confirmed === true, emaShort: bodyJson && bodyJson.emaShort, emaLong: bodyJson && bodyJson.emaLong, message: bodyJson && (bodyJson.message||bodyJson.text)||null }, refererAllowed }), {
         status: 400,
         headers: { 'Content-Type': 'application/json', ...corsHeaders() },
       });

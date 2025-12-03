@@ -74,6 +74,25 @@ export default function TradesBox({ symbol }) {
     } catch (e) { return ''; }
   }
 
+  function formatPrice(n) {
+    if (typeof n !== 'number' || Number.isNaN(n)) return '—';
+    const abs = Math.abs(n);
+    // Binance-like: show thousand separators and adaptive decimals
+    // High prices (>= 1000): 1 decimal
+    // Mid (>= 100): 2 decimals
+    // Low (< 100): up to 3-4 decimals for readability
+    let minFD = 1; let maxFD = 1;
+    if (abs >= 1000) { minFD = 1; maxFD = 1; }
+    else if (abs >= 100) { minFD = 2; maxFD = 2; }
+    else if (abs >= 1) { minFD = 3; maxFD = 3; }
+    else { minFD = 4; maxFD = 4; }
+    try {
+      return new Intl.NumberFormat('en-US', { minimumFractionDigits: minFD, maximumFractionDigits: maxFD }).format(n);
+    } catch (e) {
+      return n.toFixed(maxFD);
+    }
+  }
+
   return (
     <div className="trades-box card">
       <div className="trades-list" aria-live="polite">
@@ -83,7 +102,7 @@ export default function TradesBox({ symbol }) {
           trades.map((t) => (
             <div key={t.id} className={`trade-row ${t.isBuyerMaker ? 'sell' : 'buy'}`}>
               <div className="trade-left">
-                <span className="trade-price">{t.priceStr}</span>
+                <span className="trade-price">{formatPrice(t.price)}</span>
                 <span className="trade-sep">·</span>
                 <span className="trade-qty">{formatQty(t.qty)}</span>
               </div>
