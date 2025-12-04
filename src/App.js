@@ -536,11 +536,8 @@ function App() {
     }
 
     if (lastNotified.current !== confirmedCross) {
-      // Only notify/send when a real crossing event occurred.
-      if (!confirmedIsActualCross) {
-        lastNotified.current = confirmedCross;
-        return;
-      }
+      // For the Alerts list, always record the change (non-init) so users can see direction changes.
+      // Telegram/send remains gated by actual crossing confirmation.
   const type = confirmedCross === 'bull' ? `Bullish EMA${monitorEma1} > EMA${monitorEma2}` : `Bearish EMA${monitorEma1} < EMA${monitorEma2}`;
       const symToShowRaw = activeSymbol || symbol || '';
       const symToShow = (symToShowRaw || '').toString().replace(/[^A-Za-z0-9]/g, '').toUpperCase();
@@ -570,8 +567,8 @@ function App() {
       // Add a lightweight console trace of the cross event for operational debugging
   try { console.log('[App] confirmedCross event', { symbol: symToShow, direction: confirmedCross, price: priceToUse, serverUrl, confirmClosedCandles: monitorConfirm }); } catch (e) {}
 
-      // beep and log
-      beep();
+      // beep and log (only when actual cross to avoid noise)
+      if (confirmedIsActualCross) beep();
       const evObj = { ts: Date.now(), time: new Date().toLocaleString(), type: confirmedCross, price: lastPrice, symbol: symToShow, source: confirmedSource || 'unknown' };
       if (showDebug) console.debug('[App] created confirmedCross event', evObj);
       setEvents((s) => [evObj, ...s].slice(0, 500));
@@ -583,6 +580,8 @@ function App() {
           return;
         }
         // payload는 evObj 기반으로 구성
+        // Only send Telegram when a real crossing occurred
+        if (!confirmedIsActualCross) return;
         const payload = { symbol: evObj.symbol, price: (typeof priceToUse==='number'?priceToUse:evObj.price), message: type + ' @ ' + (typeof priceToUse==='number'?priceToUse:evObj.price), emaShort: monitorEma1, emaLong: monitorEma2, confirmed: true };
         try { if (showDebug) console.debug('[App] confirmedCross preparing /send-alert after event add', { serverUrl, payload }); } catch (e) {}
         const maxAttempts = 3; let attempt = 0; let lastError = null;
