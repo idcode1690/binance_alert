@@ -15,6 +15,7 @@ const ChartBox = React.forwardRef(function ChartBox({ symbol, minutes = 1, emaSh
   const wsModeRef = useRef('combined');
   const pollTimerRef = useRef(null);
   const hadActivityRef = useRef(false);
+  const gotKlineRef = useRef(false);
   
 
   const stopPolling = useCallback(() => {
@@ -195,6 +196,7 @@ const ChartBox = React.forwardRef(function ChartBox({ symbol, minutes = 1, emaSh
           reconnectAttemptsRef.current = 0;
           lastActivityRef.current = Date.now();
           hadActivityRef.current = false;
+          gotKlineRef.current = false;
           // start or reset watchdog
           if (watchdogTimerRef.current) { try { clearInterval(watchdogTimerRef.current); } catch (e) {} watchdogTimerRef.current = null; }
           watchdogTimerRef.current = setInterval(() => {
@@ -220,8 +222,11 @@ const ChartBox = React.forwardRef(function ChartBox({ symbol, minutes = 1, emaSh
             if (!hadActivityRef.current) {
               hadActivityRef.current = true;
             }
-            // whenever we receive any message, we can stop REST polling
-            stopPolling();
+            // only stop REST polling once we confirm kline traffic
+            if (root && (root.k || root.stream?.includes('@kline_'))) {
+              gotKlineRef.current = true;
+              stopPolling();
+            }
             // Handle aggTrade updates to keep the preview candle moving smoothly
             if (root && (root.e === 'aggTrade' || root.stream?.endsWith('@aggTrade'))) {
               const price = Number(root.p);
@@ -252,6 +257,8 @@ const ChartBox = React.forwardRef(function ChartBox({ symbol, minutes = 1, emaSh
             const o = Number(k.o); const h = Number(k.h); const l = Number(k.l); const c = Number(k.c); const t = Number(k.t);
             const isClosed = !!k.x;
             if (![o,h,l,c,t].every(Number.isFinite)) return;
+            // confirm kline traffic and stop polling
+            if (!gotKlineRef.current) { gotKlineRef.current = true; stopPolling(); }
             let { candles } = latestRef.current;
             if (!candles || candles.length === 0) return;
             const last = candles[candles.length - 1];
