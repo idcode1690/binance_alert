@@ -11,6 +11,7 @@ import Notes from './components/Notes';
 import Header from './components/Header';
 import TopMenu from './components/TopMenu';
 import ScannerPage from './pages/ScannerPage';
+import { sendTelegramMessage } from './utils/telegram';
 // 클라이언트 측 스캐너는 서버(Cloudflare Worker) cron 기반으로 대체되므로 임시 비활성화
 // import scannerManager from './lib/scannerManager';
 
@@ -38,6 +39,7 @@ function beep() {
 }
 
 function App() {
+  const chartRef = useRef(null);
   const [symbol, setSymbol] = useState(() => {
     try {
       const raw = localStorage.getItem('lastSymbol');
@@ -633,9 +635,28 @@ function App() {
     } catch (e) {}
   }, []);
 
+  // Telegram Test with chart snapshot
+  const handleTelegramTestWithImage = React.useCallback(async () => {
+    try {
+      let image = null;
+      try {
+        if (chartRef.current && typeof chartRef.current.getSnapshotPng === 'function') {
+          image = await chartRef.current.getSnapshotPng();
+        }
+      } catch (e) { image = null; }
+      const msg = `Binance Alert: 테스트 메시지 (${new Date().toLocaleString()})`;
+      const resp = await sendTelegramMessage({ message: msg, confirmed: true, image });
+      if (showDebug) console.debug('[TopMenu Test] sent', resp);
+      try { showToast('Telegram 테스트 전송 완료'); } catch (e) {}
+    } catch (e) {
+      console.error('Telegram test failed', e);
+      try { showToast(`Telegram 전송 실패: ${e?.message || e}`, false); } catch (err) {}
+    }
+  }, [showDebug, showToast]);
+
   return (
     <div className={`App ${darkMode ? 'dark' : ''}`}>
-      <TopMenu onNavigate={setView} view={view} darkMode={darkMode} toggleDark={toggleDark} status={status} connected={connected} />
+      <TopMenu onNavigate={setView} view={view} darkMode={darkMode} toggleDark={toggleDark} status={status} connected={connected} onTelegramTest={handleTelegramTestWithImage} />
       <div className="container">
         {view === 'scanner' ? (
           <div className="card scanner-full">
@@ -674,7 +695,7 @@ function App() {
             </div>
             {/* Place chart below the trades+metrics row */}
             <div style={{ marginTop: 8 }}>
-              <ChartBox symbol={symbol} minutes={monitorMinutes} emaShort={monitorEma1} emaLong={monitorEma2} />
+              <ChartBox ref={chartRef} symbol={symbol} minutes={monitorMinutes} emaShort={monitorEma1} emaLong={monitorEma2} />
             </div>
             {/* monitor badges removed per request */}
             {/* Notes moved below Alerts */}

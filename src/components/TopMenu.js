@@ -1,9 +1,13 @@
 import React from 'react';
 import { sendTelegramMessage } from '../utils/telegram';
 
-export default function TopMenu({ onNavigate, view, darkMode, toggleDark, status = 'idle', connected = false }) {
+export default function TopMenu({ onNavigate, view, darkMode, toggleDark, status = 'idle', connected = false, onTelegramTest }) {
   const [drawerOpen, setDrawerOpen] = React.useState(false);
   const handleTelegramTest = async () => {
+    if (typeof onTelegramTest === 'function') {
+      await onTelegramTest();
+      return;
+    }
     try {
       const resp = await sendTelegramMessage({ message: `Binance Alert: 테스트 메시지 (${new Date().toLocaleString()})`, confirmed: true });
       console.log('Telegram test sent:', resp);

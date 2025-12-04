@@ -18,15 +18,18 @@ function resolveEndpoint() {
   return 'https://binance-alert.idcode1690.workers.dev/send-alert';
 }
 
-export async function sendTelegramMessage({ chatId, message, text, confirmed = true } = {}) {
+export async function sendTelegramMessage({ chatId, message, text, image, confirmed = true, extra = {} } = {}) {
   const endpoint = resolveEndpoint();
   console.log('Sending Telegram via endpoint:', endpoint);
-  const payload = { chatId, confirmed };
+  const payload = { chatId, confirmed, ...extra };
   // Normalize: prefer explicit message; fall back to text
   if (typeof message === 'string' && message.trim()) {
     payload.message = message.trim();
   } else if (typeof text === 'string' && text.trim()) {
     payload.message = text.trim();
+  }
+  if (typeof image === 'string' && image.length > 32) {
+    payload.image = image;
   }
   const res = await fetch(endpoint, {
     method: 'POST',
