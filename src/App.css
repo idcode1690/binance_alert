@@ -14,6 +14,18 @@
 .menu-link { text-align: left; padding: 8px 10px; border: 1px solid var(--input-border); border-radius: 8px; background: var(--input-bg); color: var(--text); }
 .menu-link.active { border-color: var(--scanner-green); box-shadow: 0 0 0 4px rgba(16,185,129,0.14); }
 
+/* Icon-only theme toggles */
+.theme-toggle.icon-only { background: transparent; border: none; padding: 6px; border-radius: 999px; }
+.theme-toggle.icon-only:hover { background: rgba(0,0,0,0.06); }
+.App.dark .theme-toggle.icon-only:hover { background: rgba(255,255,255,0.06); }
+.theme-toggle .icon-sun { color: #f59e0b; }
+.theme-toggle .icon-moon { color: #60a5fa; }
+.menu-link.theme.icon-only { background: transparent; border: none; padding: 6px; border-radius: 999px; width: auto; align-self: flex-start; }
+.menu-link.theme.icon-only:hover { background: rgba(0,0,0,0.06); }
+.App.dark .menu-link.theme.icon-only:hover { background: rgba(255,255,255,0.06); }
+.menu-link.theme .icon-sun { color: #f59e0b; }
+.menu-link.theme .icon-moon { color: #60a5fa; }
+
 /* Mobile: show hamburger, hide desktop links */
 @media (max-width: 768px) {
   .hamburger-btn { display: inline-flex; align-items: center; justify-content: center; }

@@ -36,15 +36,15 @@ export default function TopMenu({ onNavigate, view, darkMode, toggleDark, status
           <div className="top-status" style={{fontSize: 13, color: 'var(--muted-2)'}}>
             Status: <strong style={{color: 'var(--text)'}}>{status}</strong> {connected ? <span className="status-connected">(connected)</span> : <span className="status-disconnected">(disconnected)</span>}
           </div>
-          <button className={`menu-btn theme-toggle ${darkMode ? 'active' : ''}`} onClick={() => toggleDark && toggleDark()} title={darkMode ? '라이트 모드' : '다크 모드'} aria-pressed={!!darkMode}>
+          <button className={`theme-toggle icon-only ${darkMode ? 'active' : ''}`} onClick={() => toggleDark && toggleDark()} title={darkMode ? '라이트 모드' : '다크 모드'} aria-pressed={!!darkMode}>
             {darkMode ? (
               // Moon icon for dark mode
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <svg className="icon-moon" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                 <path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79Z"></path>
               </svg>
             ) : (
               // Sun icon for light mode
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <svg className="icon-sun" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                 <path d="M12 18a6 6 0 1 0 0-12 6 6 0 0 0 0 12Zm0 4a1 1 0 0 1-1-1v-1a1 1 0 1 1 2 0v1a1 1 0 0 1-1 1Zm0-18a1 1 0 0 1-1-1V2a1 1 0 1 1 2 0v1a1 1 0 0 1-1 1Zm10 9a1 1 0 0 1-1-1h-1a1 1 0 1 1 0-2h1a1 1 0 1 1 2 0v1a1 1 0 0 1-1 1ZM4 12a1 1 0 0 1-1-1H2a1 1 0 1 1 0-2h1a1 1 0 1 1 2 0v1a1 1 0 0 1-1 1Zm14.95 6.364a1 1 0 0 1-1.414 1.414l-.707-.707a1 1 0 1 1 1.414-1.414l.707.707ZM6.121 6.121a1 1 0 0 1-1.414 1.414l-.707-.707A1 1 0 1 1 5.414 5.414l.707.707Zm12.728-4.95a1 1 0 0 1 1.414 1.414l-.707.707a1 1 0 0 1-1.414-1.414l.707-.707ZM6.828 18.364a1 1 0 0 1-1.414 1.414l-.707-.707a1 1 0 1 1 1.414-1.414l.707.707Z"></path>
               </svg>
             )}
@@ -60,13 +60,13 @@ export default function TopMenu({ onNavigate, view, darkMode, toggleDark, status
           <button className={`menu-link ${view === 'alerts' ? 'active' : ''}`} onClick={() => { onNavigate && onNavigate('alerts'); setDrawerOpen(false); }}>Alerts</button>
           <button className={`menu-link ${view === 'scanner' ? 'active' : ''}`} onClick={() => { onNavigate && onNavigate('scanner'); setDrawerOpen(false); }}>Scanner</button>
           <button className="menu-link" onClick={() => { handleTelegramTest(); setDrawerOpen(false); }}>Telegram Test</button>
-          <button className={`menu-link theme ${darkMode ? 'active' : ''}`} onClick={() => { toggleDark && toggleDark(); setDrawerOpen(false); }} title={darkMode ? '라이트 모드' : '다크 모드'}>
+          <button className={`menu-link theme icon-only ${darkMode ? 'active' : ''}`} onClick={() => { toggleDark && toggleDark(); setDrawerOpen(false); }} title={darkMode ? '라이트 모드' : '다크 모드'}>
             {darkMode ? (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <svg className="icon-moon" width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                 <path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79Z"></path>
               </svg>
             ) : (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <svg className="icon-sun" width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                 <path d="M12 18a6 6 0 1 0 0-12 6 6 0 0 0 0 12Zm0 4a1 1 0 0 1-1-1v-1a1 1 0 1 1 2 0v1a1 1 0 0 1-1 1Zm0-18a1 1 0 0 1-1-1V2a1 1 0 1 1 2 0v1a1 1 0 0 1-1 1Zm10 9a1 1 0 0 1-1-1h-1a1 1 0 1 1 0-2h1a1 1 0 1 1 2 0v1a1 1 0 0 1-1 1ZM4 12a1 1 0 0 1-1-1H2a1 1 0 1 1 0-2h1a1 1 0 1 1 2 0v1a1 1 0 0 1-1 1Zm14.95 6.364a1 1 0 0 1-1.414 1.414l-.707-.707a1 1 0 1 1 1.414-1.414l.707.707ZM6.121 6.121a1 1 0 0 1-1.414 1.414l-.707-.707A1 1 0 1 1 5.414 5.414l.707.707Zm12.728-4.95a1 1 0 0 1 1.414 1.414l-.707.707a1 1 0 0 1-1.414-1.414l.707-.707ZM6.828 18.364a1 1 0 0 1-1.414 1.414l-.707-.707a1 1 0 1 1 1.414-1.414l.707.707Z"></path>
               </svg>
             )}
