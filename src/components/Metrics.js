@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import TradesBox from './TradesBox';
-import ChartBox from './ChartBox';
 
 function formatNumberForDisplay(v) {
   if (typeof v !== 'number' || Number.isNaN(v)) return '—';
@@ -180,9 +179,6 @@ export default function Metrics({ activeSymbol, symbol, lastPrice, lastTick, las
       </div>
       <div className="metrics-right">
         <TradesBox symbol={symbol} />
-        <div style={{ marginTop: 8 }}>
-          <ChartBox symbol={symbol} minutes={monitorMinutes} emaShort={monitorEma1} emaLong={monitorEma2} />
-        </div>
       </div>
     </div>
   );

@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import useEmaCross from './hooks/useEmaCross';
 import Alerts from './components/Alerts';
 import Metrics from './components/Metrics';
+import ChartBox from './components/ChartBox';
 import Controls from './components/Controls';
 import DebugPanel from './components/DebugPanel';
 import Notes from './components/Notes';
@@ -670,6 +671,10 @@ function App() {
               />
             <div style={{ marginTop: 12 }}>
               <Metrics activeSymbol={activeSymbol} symbol={symbol} lastPrice={lastPrice} lastTick={lastTick} lastCandleClosed={lastCandleClosed} cross={cross} confirmedCross={confirmedCross} ema9={ema9} ema26={ema26} monitorEma1={monitorEma1} monitorEma2={monitorEma2} monitorMinutes={monitorMinutes} />
+            </div>
+            {/* Place chart below the trades+metrics row */}
+            <div style={{ marginTop: 8 }}>
+              <ChartBox symbol={symbol} minutes={monitorMinutes} emaShort={monitorEma1} emaLong={monitorEma2} />
             </div>
             {/* monitor badges removed per request */}
             {/* Notes moved below Alerts */}
