@@ -10,6 +10,33 @@ export default function ChartBox({ symbol, minutes = 1, emaShort = 9, emaLong = 
   const latestRef = useRef({ candles: [], emaS: [], emaL: [], emaSVal: null, emaLVal: null });
   const reconnectRef = useRef({ attempt: 0, timer: null, hadMessage: false });
 
+  // When EMA inputs change, recompute EMA arrays from current candles immediately
+  // so overlays reflect the new values without waiting for REST reseed timing.
+  useEffect(() => {
+    try {
+      const seeded = latestRef.current && Array.isArray(latestRef.current.candles) ? latestRef.current.candles : null;
+      if (!seeded || seeded.length === 0) return;
+      const closes = seeded.map(c => c.c).filter(Number.isFinite);
+      if (closes.length < Math.max(emaShort, emaLong)) {
+        latestRef.current = { candles: seeded, emaS: [], emaL: [], emaSVal: null, emaLVal: null };
+        setPoints(p => ({ candles: seeded, emaS: [], emaL: [] }));
+        return;
+      }
+      let es = calculateInitialEMA(closes.slice(0, emaShort), emaShort);
+      let el = calculateInitialEMA(closes.slice(0, emaLong), emaLong);
+      const emaSArr = [es];
+      const emaLArr = [el];
+      for (let i = Math.max(emaShort, emaLong); i < closes.length; i++) {
+        es = updateEMA(es, closes[i], emaShort);
+        el = updateEMA(el, closes[i], emaLong);
+        emaSArr.push(es);
+        emaLArr.push(el);
+      }
+      latestRef.current = { candles: seeded, emaS: emaSArr, emaL: emaLArr, emaSVal: emaSArr[emaSArr.length - 1], emaLVal: emaLArr[emaLArr.length - 1] };
+      setPoints(p => ({ candles: seeded, emaS: emaSArr, emaL: emaLArr }));
+    } catch (e) {}
+  }, [emaShort, emaLong]);
+
   useEffect(() => {
     const q = (symbol || '').toString().replace(/[^A-Za-z0-9]/g, '').toUpperCase();
     const interval = `${Number(minutes) || 1}m`;
