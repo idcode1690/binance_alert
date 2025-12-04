@@ -550,9 +550,13 @@ function App() {
           lastNotified.current = confirmedCross;
           return;
         }
+        // Create and add alert IMMEDIATELY even if price isn't yet available.
+        const evObj = { ts: Date.now(), time: new Date().toLocaleString(), type: confirmedCross, price: priceToUse ?? lastPrice ?? lastTick, symbol: symToShow, source: confirmedSource || 'unknown' };
+        if (showDebug) console.debug('[App] created confirmedCross event', evObj);
+        setEvents((s) => [evObj, ...s].slice(0, 500));
+        // If price is missing, skip notification/telegram but keep list updated.
         if (priceToUse == null) {
-          // If we truly have no price at all, skip but log in debug so user can inspect
-          if (showDebug) console.debug('[App] skipping notification: no price available (lastPrice & lastTick are null)', { confirmedCross, confirmedSource, activeSymbol, symbol });
+          if (showDebug) console.debug('[App] notification deferred: no price available (lastPrice & lastTick are null)', { confirmedCross, confirmedSource, activeSymbol, symbol });
           lastNotified.current = confirmedCross;
           return;
         }
@@ -567,11 +571,8 @@ function App() {
       // Add a lightweight console trace of the cross event for operational debugging
   try { console.log('[App] confirmedCross event', { symbol: symToShow, direction: confirmedCross, price: priceToUse, serverUrl, confirmClosedCandles: monitorConfirm }); } catch (e) {}
 
-      // beep and log (only when actual cross to avoid noise)
+      // beep (only when actual cross to avoid noise)
       if (confirmedIsActualCross) beep();
-      const evObj = { ts: Date.now(), time: new Date().toLocaleString(), type: confirmedCross, price: lastPrice, symbol: symToShow, source: confirmedSource || 'unknown' };
-      if (showDebug) console.debug('[App] created confirmedCross event', evObj);
-      setEvents((s) => [evObj, ...s].slice(0, 500));
       // 서버 텔레그램 발송은 실제 알림 리스트에 항목이 추가된 이후에만 수행
       (async () => {
         if (!serverUrl) {
