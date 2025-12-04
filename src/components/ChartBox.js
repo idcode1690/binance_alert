@@ -392,7 +392,7 @@ const ChartBox = React.forwardRef(function ChartBox({ symbol, minutes = 1, emaSh
           );
         })}
         <path d={emaSPath} fill="none" stroke="#f59e0b" strokeWidth="1" />
-        <path d={emaLPath} fill="none" stroke="#065f46" strokeWidth="1" />
+        <path d={emaLPath} fill="none" stroke="#065f46" strokeWidth="2" />
         {crossIdxs.map((i) => {
           const cx = x(i);
           const cy = y((emaSWin[i] + emaLWin[i]) / 2);
