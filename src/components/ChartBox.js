@@ -303,8 +303,6 @@ const ChartBox = React.forwardRef(function ChartBox({ symbol, minutes = 1, emaSh
         };
       } catch (e) {}
     };
-    // start polling immediately as a fallback while WS connects
-    startPolling();
     connectWs();
     return () => {
       closed = true;
