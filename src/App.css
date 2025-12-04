@@ -177,6 +177,29 @@
   display: block;
 }
 
+/* Mobile responsive: stack layout, larger touch targets, keep desktop unchanged */
+@media (max-width: 768px) {
+  .container { padding: 8px 12px 16px 12px; }
+  .card { padding: 8px; }
+  .main-card, .scanner-full { max-width: 100%; }
+  .layout-grid { display: block; }
+  .sidebar { display: none; }
+  .controls { flex-wrap: wrap; gap: 6px; }
+  .controls input[type="text"] { min-width: 60px; max-width: 120px; }
+  .controls input[type="number"] { min-width: 40px; max-width: 56px; }
+  .interval-btns { gap: 4px; }
+  .small-interval-btn { min-width: 26px; padding: 4px 8px; }
+  .alerts-metrics-row { grid-template-columns: 1fr; gap: 8px; }
+  .metrics { grid-template-columns: 1fr; }
+  .metrics-compact { max-width: 100%; }
+  .trades-box { height: auto; min-height: 140px; }
+  .trades-list { max-height: 180px; overflow-y: auto; }
+  .monitor-badge { font-size: 12px; padding: 4px 8px; }
+  .alerts-list .alert-item { padding: 8px 6px; }
+  .alert-left .copy-btn { padding: 8px; }
+  .alert-right .delete-btn { padding: 8px; }
+}
+
 /* Layout grid: sidebar + main area */
 .layout-grid {
   display: grid;

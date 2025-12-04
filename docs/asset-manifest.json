@@ -1,15 +1,15 @@
 {
   "files": {
-    "main.css": "/binance_alert/static/css/main.7fb0b1db.css",
+    "main.css": "/binance_alert/static/css/main.f1994e70.css",
     "main.js": "/binance_alert/static/js/main.af5f7897.js",
     "static/js/453.8dacb8d6.chunk.js": "/binance_alert/static/js/453.8dacb8d6.chunk.js",
     "index.html": "/binance_alert/index.html",
-    "main.7fb0b1db.css.map": "/binance_alert/static/css/main.7fb0b1db.css.map",
+    "main.f1994e70.css.map": "/binance_alert/static/css/main.f1994e70.css.map",
     "main.af5f7897.js.map": "/binance_alert/static/js/main.af5f7897.js.map",
     "453.8dacb8d6.chunk.js.map": "/binance_alert/static/js/453.8dacb8d6.chunk.js.map"
   },
   "entrypoints": [
-    "static/css/main.7fb0b1db.css",
+    "static/css/main.f1994e70.css",
     "static/js/main.af5f7897.js"
   ]
 }
