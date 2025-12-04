@@ -1,13 +1,53 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { calculateInitialEMA, updateEMA } from '../utils/ema';
 
 // Render a live candlestick chart seeded from REST and updated via websocket,
 // with EMA overlays. Keeps desktop layout and mobile responsiveness intact.
-export default function ChartBox({ symbol, minutes = 1, emaShort = 9, emaLong = 26 }) {
+const ChartBox = React.forwardRef(function ChartBox({ symbol, minutes = 1, emaShort = 9, emaLong = 26 }, ref) {
   // points: { candles: [{o,h,l,c,t}], emaS: number[], emaL: number[] }
   const [points, setPoints] = useState(null);
   const wsRef = useRef(null);
   const latestRef = useRef({ candles: [], emaS: [], emaL: [], emaSVal: null, emaLVal: null });
+  const seedReadyRef = useRef(false);
+  const reconnectAttemptsRef = useRef(0);
+  const containerRef = useRef(null);
+  // Expose snapshot method before any early returns
+  useImperativeHandle(ref, () => ({
+    async getSnapshotPng() {
+      try {
+        const svg = containerRef.current ? containerRef.current.querySelector('svg') : null;
+        if (!svg) return null;
+        const vb = svg.getAttribute('viewBox');
+        let W = 800, H = 200;
+        try {
+          if (vb) {
+            const parts = vb.split(/\s+/).map(Number);
+            if (parts.length === 4 && parts.every((n) => Number.isFinite(n))) { W = parts[2]; H = parts[3]; }
+          }
+        } catch (e) {}
+        const xml = new XMLSerializer().serializeToString(svg);
+        const svgBlob = new Blob([xml], { type: 'image/svg+xml;charset=utf-8' });
+        const url = URL.createObjectURL(svgBlob);
+        const img = new Image();
+        const dataUrl = await new Promise((resolve) => {
+          img.onload = () => {
+            try {
+              const canvas = document.createElement('canvas');
+              canvas.width = W; canvas.height = H;
+              const ctx = canvas.getContext('2d');
+              ctx.fillStyle = '#0b0f14';
+              ctx.fillRect(0, 0, W, H);
+              ctx.drawImage(img, 0, 0, W, H);
+              URL.revokeObjectURL(url);
+              resolve(canvas.toDataURL('image/png'));
+            } catch (e) { resolve(null); }
+          };
+          try { img.src = url; } catch (e) { resolve(null); }
+        });
+        return dataUrl;
+      } catch (e) { return null; }
+    }
+  }), []);
 
   useEffect(() => {
     const q = (symbol || '').toString().replace(/[^A-Za-z0-9]/g, '').toUpperCase();
@@ -51,74 +91,112 @@ export default function ChartBox({ symbol, minutes = 1, emaShort = 9, emaLong = 
 
         latestRef.current = { candles: alignedCandles, emaS: emaSArr, emaL: emaLArr, emaSVal: emaSArr[emaSArr.length - 1], emaLVal: emaLArr[emaLArr.length - 1] };
         setPoints({ candles: alignedCandles, emaS: emaSArr, emaL: emaLArr });
+        seedReadyRef.current = true;
       } catch (e) { setPoints(null); }
     })();
   }, [symbol, minutes, emaShort, emaLong]);
 
-  // Live updates via Binance futures websocket kline stream, mirroring Binance behavior.
+  // Connect websocket only after REST seeding completes
   useEffect(() => {
     const q = (symbol || '').toString().replace(/[^A-Za-z0-9]/g, '').toLowerCase();
     const interval = `${Number(minutes) || 1}m`;
     if (!q) return;
-    const stream = `${q}@kline_${interval}`;
-    const url = `wss://fstream.binance.com/ws/${stream}`;
-    try {
-      const ws = new WebSocket(url);
-      wsRef.current = ws;
-      ws.onmessage = (ev) => {
-        try {
-          const payload = JSON.parse(ev.data);
-          const k = payload.k || (payload.data && payload.data.k) || null;
-          if (!k) return;
-          const o = Number(k.o); const h = Number(k.h); const l = Number(k.l); const c = Number(k.c); const t = Number(k.t);
-          const isClosed = !!k.x; // true if candle closed
-          if (![o,h,l,c,t].every(Number.isFinite)) return;
-          let { candles, emaS, emaL, emaSVal, emaLVal } = latestRef.current;
-          if (!candles || candles.length === 0) return;
-          const last = candles[candles.length - 1];
-          if (last && last.t === t) {
-            if (isClosed) {
-              const updated = { o, h, l, c, t };
-              const nextCandles = candles.slice(0, -1).concat(updated).slice(-200);
-              emaSVal = updateEMA(emaSVal ?? emaS[emaS.length - 1], c, emaShort);
-              emaLVal = updateEMA(emaLVal ?? emaL[emaL.length - 1], c, emaLong);
-              const nextES = [...emaS.slice(0, -1), emaSVal].slice(-200);
-              const nextEL = [...emaL.slice(0, -1), emaLVal].slice(-200);
-              latestRef.current = { candles: nextCandles, emaS: nextES, emaL: nextEL, emaSVal, emaLVal };
-              setPoints({ candles: nextCandles, emaS: nextES, emaL: nextEL });
+    if (!seedReadyRef.current) return; // wait until REST seed ready
+
+    let closed = false;
+    const connectWs = () => {
+      if (closed) return;
+      try {
+        const url = `wss://fstream.binance.com/ws/${q}@kline_${interval}`;
+        const ws = new WebSocket(url);
+        wsRef.current = ws;
+        ws.onopen = () => { reconnectAttemptsRef.current = 0; };
+        ws.onmessage = (ev) => {
+          try {
+            const payload = JSON.parse(ev.data);
+            const k = payload.k || (payload.data && payload.data.k) || null;
+            if (!k) return;
+            const o = Number(k.o); const h = Number(k.h); const l = Number(k.l); const c = Number(k.c); const t = Number(k.t);
+            const isClosed = !!k.x;
+            if (![o,h,l,c,t].every(Number.isFinite)) return;
+            let { candles, emaS, emaL, emaSVal, emaLVal } = latestRef.current;
+            if (!candles || candles.length === 0) return;
+            const last = candles[candles.length - 1];
+            if (last && last.t === t) {
+              if (isClosed) {
+                const updated = { o, h, l, c, t };
+                const nextCandles = candles.slice(0, -1).concat(updated).slice(-200);
+                emaSVal = updateEMA(emaSVal ?? emaS[emaS.length - 1], c, emaShort);
+                emaLVal = updateEMA(emaLVal ?? emaL[emaL.length - 1], c, emaLong);
+                const nextES = [...emaS.slice(0, -1), emaSVal].slice(-200);
+                const nextEL = [...emaL.slice(0, -1), emaLVal].slice(-200);
+                latestRef.current = { candles: nextCandles, emaS: nextES, emaL: nextEL, emaSVal, emaLVal };
+                setPoints({ candles: nextCandles, emaS: nextES, emaL: nextEL });
+              } else {
+                const preview = { o, h, l, c, t };
+                const previewCandles = candles.slice(0, -1).concat(preview);
+                const prevES = emaS[emaS.length - 1];
+                const prevEL = emaL[emaL.length - 1];
+                const previewES = updateEMA(prevES, c, emaShort);
+                const previewEL = updateEMA(prevEL, c, emaLong);
+                setPoints({ candles: previewCandles, emaS: [...emaS.slice(0, -1), previewES], emaL: [...emaL.slice(0, -1), previewEL] });
+              }
             } else {
-              const preview = { o, h, l, c, t };
-              const previewCandles = candles.slice(0, -1).concat(preview);
-              const prevES = emaS[emaS.length - 1];
-              const prevEL = emaL[emaL.length - 1];
-              const previewES = updateEMA(prevES, c, emaShort);
-              const previewEL = updateEMA(prevEL, c, emaLong);
-              setPoints({ candles: previewCandles, emaS: [...emaS.slice(0, -1), previewES], emaL: [...emaL.slice(0, -1), previewEL] });
+              if (isClosed) {
+                const nextCandles = [...candles, { o, h, l, c, t }].slice(-200);
+                emaSVal = updateEMA(emaSVal ?? emaS[emaS.length - 1], c, emaShort);
+                emaLVal = updateEMA(emaLVal ?? emaL[emaL.length - 1], c, emaLong);
+                const nextES = [...emaS, emaSVal].slice(-200);
+                const nextEL = [...emaL, emaLVal].slice(-200);
+                latestRef.current = { candles: nextCandles, emaS: nextES, emaL: nextEL, emaSVal, emaLVal };
+                setPoints({ candles: nextCandles, emaS: nextES, emaL: nextEL });
+              } else {
+                // new preview candle opened
+                const previewCandles = [...candles, { o, h, l, c, t }].slice(-200);
+                const previewES = updateEMA(emaS[emaS.length - 1], c, emaShort);
+                const previewEL = updateEMA(emaL[emaL.length - 1], c, emaLong);
+                setPoints({ candles: previewCandles, emaS: [...emaS, previewES].slice(-200), emaL: [...emaL, previewEL].slice(-200) });
+              }
             }
-          } else {
-            if (isClosed) {
-              const nextCandles = [...candles, { o, h, l, c, t }].slice(-200);
-              emaSVal = updateEMA(emaSVal ?? emaS[emaS.length - 1], c, emaShort);
-              emaLVal = updateEMA(emaLVal ?? emaL[emaL.length - 1], c, emaLong);
-              const nextES = [...emaS, emaSVal].slice(-200);
-              const nextEL = [...emaL, emaLVal].slice(-200);
-              latestRef.current = { candles: nextCandles, emaS: nextES, emaL: nextEL, emaSVal, emaLVal };
-              setPoints({ candles: nextCandles, emaS: nextES, emaL: nextEL });
-            } else {
-              // new preview candle opened
-              const previewCandles = [...candles, { o, h, l, c, t }].slice(-200);
-              const previewES = updateEMA(emaS[emaS.length - 1], c, emaShort);
-              const previewEL = updateEMA(emaL[emaL.length - 1], c, emaLong);
-              setPoints({ candles: previewCandles, emaS: [...emaS, previewES].slice(-200), emaL: [...emaL, previewEL].slice(-200) });
-            }
-          }
-        } catch (e) {}
-      };
-      ws.onerror = () => {};
-      ws.onclose = () => {};
-    } catch (e) {}
-    return () => { try { if (wsRef.current) wsRef.current.close(); } catch (e) {} };
+          } catch (e) {}
+        };
+        ws.onerror = () => {};
+        ws.onclose = () => {
+          if (closed) return;
+          const attempt = reconnectAttemptsRef.current || 0;
+          const backoff = Math.min(30000, 1000 * Math.pow(2, attempt));
+          reconnectAttemptsRef.current = attempt + 1;
+          setTimeout(connectWs, backoff);
+        };
+      } catch (e) {}
+    };
+    connectWs();
+    return () => {
+      closed = true;
+      try { if (wsRef.current) wsRef.current.close(); } catch (e) {}
+    };
   }, [symbol, minutes, emaShort, emaLong]);
+
+  // Recompute EMA overlays immediately when periods change
+  useEffect(() => {
+    try {
+      const { candles } = latestRef.current || {};
+      if (!candles || candles.length === 0) return;
+      const closes = candles.map(c => c.c);
+      if (closes.length < Math.max(emaShort, emaLong)) return;
+      let es = calculateInitialEMA(closes.slice(0, emaShort), emaShort);
+      const emaSFull = [es];
+      for (let i = emaShort; i < closes.length; i++) { es = updateEMA(es, closes[i], emaShort); emaSFull.push(es); }
+      let el = calculateInitialEMA(closes.slice(0, emaLong), emaLong);
+      const emaLFull = [el];
+      for (let i = emaLong; i < closes.length; i++) { el = updateEMA(el, closes[i], emaLong); emaLFull.push(el); }
+      const align = closes.length - Math.max(emaShort, emaLong) + 1;
+      const emaSArr = emaSFull.slice(emaSFull.length - align);
+      const emaLArr = emaLFull.slice(emaLFull.length - align);
+      latestRef.current = { candles, emaS: emaSArr, emaL: emaLArr, emaSVal: emaSArr[emaSArr.length - 1], emaLVal: emaLArr[emaLArr.length - 1] };
+      setPoints({ candles, emaS: emaSArr, emaL: emaLArr });
+    } catch (e) {}
+  }, [emaShort, emaLong]);
 
   if (!points || !points.candles || points.candles.length === 0) {
     return (
@@ -151,8 +229,10 @@ export default function ChartBox({ symbol, minutes = 1, emaShort = 9, emaLong = 
   const lastEmaS = points.emaS.length ? points.emaS[points.emaS.length - 1] : null;
   const lastEmaL = points.emaL.length ? points.emaL[points.emaL.length - 1] : null;
 
+  
+
   return (
-    <div className="chart-box">
+    <div className="chart-box" ref={containerRef}>
       <svg className="chart-svg" width="100%" height={h} viewBox={`0 0 ${w} ${h}`}>
         {viewCandles.map((c, i) => {
           const isUp = c.c >= c.o;
@@ -180,4 +260,6 @@ export default function ChartBox({ symbol, minutes = 1, emaShort = 9, emaLong = 
       </div>
     </div>
   );
-}
+});
+
+export default ChartBox;
