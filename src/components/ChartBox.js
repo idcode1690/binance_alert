@@ -391,8 +391,8 @@ const ChartBox = React.forwardRef(function ChartBox({ symbol, minutes = 1, emaSh
             </g>
           );
         })}
-        <path d={emaSPath} fill="none" stroke="#10b981" strokeWidth="1.2" />
-        <path d={emaLPath} fill="none" stroke="#ef4444" strokeWidth="1.2" />
+        <path d={emaSPath} fill="none" stroke="#f59e0b" strokeWidth="1" />
+        <path d={emaLPath} fill="none" stroke="#065f46" strokeWidth="1" />
         {crossIdxs.map((i) => {
           const cx = x(i);
           const cy = y((emaSWin[i] + emaLWin[i]) / 2);
@@ -400,8 +400,8 @@ const ChartBox = React.forwardRef(function ChartBox({ symbol, minutes = 1, emaSh
         })}
       </svg>
       <div className="chart-legend">
-        <span className="legend-item" style={{ color: '#10b981' }}>{`EMA${emaShort}${lastEmaS!=null?`: ${lastEmaS.toFixed(2)}`:''}`}</span>
-        <span className="legend-item" style={{ color: '#ef4444' }}>{`EMA${emaLong}${lastEmaL!=null?`: ${lastEmaL.toFixed(2)}`:''}`}</span>
+        <span className="legend-item" style={{ color: '#f59e0b' }}>{`EMA${emaShort}${lastEmaS!=null?`: ${lastEmaS.toFixed(2)}`:''}`}</span>
+        <span className="legend-item" style={{ color: '#065f46' }}>{`EMA${emaLong}${lastEmaL!=null?`: ${lastEmaL.toFixed(2)}`:''}`}</span>
       </div>
     </div>
   );
