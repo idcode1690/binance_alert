@@ -32,12 +32,16 @@ export default function TradesBox({ symbol }) {
           const raw = JSON.parse(ev.data);
           const data = raw && raw.data ? raw.data : raw; // support combined stream shape
           if (!data || typeof data.t === 'undefined' || typeof data.p === 'undefined') return;
+          const priceNum = Number(data.p);
+          const qtyNum = Number(data.q);
+          // Guard against occasional zero/invalid values from stream; skip nonsensical trades
+          if (!Number.isFinite(priceNum) || !Number.isFinite(qtyNum) || priceNum <= 0 || qtyNum <= 0) return;
           const t = {
             id: data.t,
-            price: Number(data.p),
+            price: priceNum,
             priceStr: typeof data.p === 'string' ? data.p : String(data.p),
-            qty: Number(data.q),
-            notional: Number(data.p) * Number(data.q),
+            qty: qtyNum,
+            notional: priceNum * qtyNum,
             ts: data.T,
             isBuyerMaker: !!data.m,
           };
