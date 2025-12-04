@@ -4,25 +4,45 @@ import { calculateInitialEMA, updateEMA } from '../utils/ema';
 // Render a live candlestick chart seeded from REST and updated via websocket,
 // with EMA overlays. Keeps desktop layout and mobile responsiveness intact.
 const ChartBox = React.forwardRef(function ChartBox({ symbol, minutes = 1, emaShort = 9, emaLong = 26 }, ref) {
-  // points: { candles: [{o,h,l,c,t}], emaS: number[], emaL: number[] }
   const [points, setPoints] = useState(null);
   const wsRef = useRef(null);
   const latestRef = useRef({ candles: [], emaS: [], emaL: [], emaSVal: null, emaLVal: null });
-  const seedReadyRef = useRef(false);
-  const [seedReady, setSeedReady] = useState(false);
+  
   const reconnectAttemptsRef = useRef(0);
   const containerRef = useRef(null);
   const lastActivityRef = useRef(0);
   const watchdogTimerRef = useRef(null);
-  const wsModeRef = useRef('combined'); // default to combined (kline + aggTrade)
-  const pollTimerRef = useRef(null); // REST polling fallback when WS is unavailable
+  const wsModeRef = useRef('combined');
+  const pollTimerRef = useRef(null);
+  
 
   const stopPolling = useCallback(() => {
-    if (pollTimerRef.current) {
-      try { clearInterval(pollTimerRef.current); } catch (e) {}
-      pollTimerRef.current = null;
-    }
+    if (pollTimerRef.current) { try { clearInterval(pollTimerRef.current); } catch (e) {} pollTimerRef.current = null; }
   }, []);
+
+  const recalcAndSet = useCallback((candles) => {
+    try {
+      const closes = (candles || []).map(c => c.c);
+      const need = Math.max(Number(emaShort) || 9, Number(emaLong) || 26);
+      if (!closes.length || closes.length < need) {
+        latestRef.current = { candles: candles || [], emaS: [], emaL: [], emaSVal: null, emaLVal: null };
+        setPoints({ candles: candles || [], emaS: [], emaL: [] });
+        return;
+      }
+      let es = calculateInitialEMA(closes.slice(0, emaShort), emaShort);
+      const emaSFull = [es];
+      for (let i = emaShort; i < closes.length; i++) { es = updateEMA(es, closes[i], emaShort); emaSFull.push(es); }
+      let el = calculateInitialEMA(closes.slice(0, emaLong), emaLong);
+      const emaLFull = [el];
+      for (let i = emaLong; i < closes.length; i++) { el = updateEMA(el, closes[i], emaLong); emaLFull.push(el); }
+      const align = Math.max(1, closes.length - Math.max(emaShort, emaLong) + 1);
+      const emaSArr = emaSFull.slice(emaSFull.length - align);
+      const emaLArr = emaLFull.slice(emaLFull.length - align);
+      const alignedCandles = (candles || []).slice(Math.max(0, (candles?.length || 0) - align));
+      latestRef.current = { candles: alignedCandles, emaS: emaSArr, emaL: emaLArr, emaSVal: emaSArr[emaSArr.length - 1], emaLVal: emaLArr[emaLArr.length - 1] };
+      setPoints({ candles: alignedCandles, emaS: emaSArr, emaL: emaLArr });
+    } catch (e) {}
+  }, [emaShort, emaLong]);
 
   const startPolling = useCallback(() => {
     if (pollTimerRef.current) return;
@@ -44,50 +64,33 @@ const ChartBox = React.forwardRef(function ChartBox({ symbol, minutes = 1, emaSh
         const closeTime = Number(last[6]);
         if (![t,o,h,l,c,closeTime].every(Number.isFinite)) return;
         const isClosed = Date.now() >= closeTime;
-        // apply same update logic as WS
-        let { candles, emaS, emaL, emaSVal, emaLVal } = latestRef.current;
+        const { candles } = latestRef.current;
         if (!candles || candles.length === 0) return;
         const lastLocal = candles[candles.length - 1];
         if (lastLocal && lastLocal.t === t) {
           if (isClosed) {
-            const updated = { o, h, l, c, t };
-            const nextCandles = candles.slice(0, -1).concat(updated).slice(-200);
-            emaSVal = updateEMA(emaSVal ?? emaS[emaS.length - 1], c, emaShort);
-            emaLVal = updateEMA(emaLVal ?? emaL[emaL.length - 1], c, emaLong);
-            const nextES = [...emaS.slice(0, -1), emaSVal].slice(-200);
-            const nextEL = [...emaL.slice(0, -1), emaLVal].slice(-200);
-            latestRef.current = { candles: nextCandles, emaS: nextES, emaL: nextEL, emaSVal, emaLVal };
-            setPoints({ candles: nextCandles, emaS: nextES, emaL: nextEL });
+            const nextCandles = candles.slice(0, -1).concat({ o, h, l, c, t }).slice(-200);
+            recalcAndSet(nextCandles);
           } else {
-            const preview = { o, h, l, c, t };
-            const previewCandles = candles.slice(0, -1).concat(preview);
-            const prevES = emaS[emaS.length - 1];
-            const prevEL = emaL[emaL.length - 1];
-            const previewES = updateEMA(prevES, c, emaShort);
-            const previewEL = updateEMA(prevEL, c, emaLong);
-            setPoints({ candles: previewCandles, emaS: [...emaS.slice(0, -1), previewES], emaL: [...emaL.slice(0, -1), previewEL] });
+            const prev = candles[candles.length - 1];
+            const merged = { o: prev.o, h: Math.max(prev.h, h), l: Math.min(prev.l, l), c, t };
+            const previewCandles = candles.slice(0, -1).concat(merged);
+            recalcAndSet(previewCandles);
           }
         } else {
           if (isClosed) {
             const nextCandles = [...candles, { o, h, l, c, t }].slice(-200);
-            emaSVal = updateEMA(emaSVal ?? emaS[emaS.length - 1], c, emaShort);
-            emaLVal = updateEMA(emaLVal ?? emaL[emaL.length - 1], c, emaLong);
-            const nextES = [...emaS, emaSVal].slice(-200);
-            const nextEL = [...emaL, emaLVal].slice(-200);
-            latestRef.current = { candles: nextCandles, emaS: nextES, emaL: nextEL, emaSVal, emaLVal };
-            setPoints({ candles: nextCandles, emaS: nextES, emaL: nextEL });
+            recalcAndSet(nextCandles);
           } else {
             const previewCandles = [...candles, { o, h, l, c, t }].slice(-200);
-            const previewES = updateEMA(emaS[emaS.length - 1], c, emaShort);
-            const previewEL = updateEMA(emaL[emaL.length - 1], c, emaLong);
-            setPoints({ candles: previewCandles, emaS: [...emaS, previewES].slice(-200), emaL: [...emaL, previewEL].slice(-200) });
+            recalcAndSet(previewCandles);
           }
         }
-      } catch (e) { /* ignore */ }
+      } catch (e) {}
     };
     pollTimerRef.current = setInterval(pollOnce, stepMs);
     pollOnce();
-  }, [symbol, minutes, emaShort, emaLong]);
+  }, [symbol, minutes, recalcAndSet]);
   // Expose snapshot method before any early returns
   useImperativeHandle(ref, () => ({
     async getSnapshotPng() {
@@ -130,9 +133,8 @@ const ChartBox = React.forwardRef(function ChartBox({ symbol, minutes = 1, emaSh
     const q = (symbol || '').toString().replace(/[^A-Za-z0-9]/g, '').toUpperCase();
     const interval = `${Number(minutes) || 1}m`;
     if (!q) return;
+    let closed = false;
     // reset seed gate when starting a new seed
-    seedReadyRef.current = false;
-    setSeedReady(false);
     (async () => {
       try {
         const need = Math.max(Number(emaShort) || 9, Number(emaLong) || 26) + 120;
@@ -171,97 +173,11 @@ const ChartBox = React.forwardRef(function ChartBox({ symbol, minutes = 1, emaSh
 
         latestRef.current = { candles: alignedCandles, emaS: emaSArr, emaL: emaLArr, emaSVal: emaSArr[emaSArr.length - 1], emaLVal: emaLArr[emaLArr.length - 1] };
         setPoints({ candles: alignedCandles, emaS: emaSArr, emaL: emaLArr });
-        seedReadyRef.current = true;
-        setSeedReady(true);
+        
         // reset reconnect attempts on fresh seed
         reconnectAttemptsRef.current = 0;
-        lastActivityRef.current = Date.now();
-        // start polling immediately; it will stop when WS opens
-        startPolling();
-      } catch (e) { setPoints(null); }
+      } catch (e) { /* ignore */ }
     })();
-  }, [symbol, minutes, emaShort, emaLong]);
-
-  // Connect websocket only after REST seeding completes
-  useEffect(() => {
-    const q = (symbol || '').toString().replace(/[^A-Za-z0-9]/g, '').toLowerCase();
-    const interval = `${Number(minutes) || 1}m`;
-    if (!q) return;
-    if (!seedReady) return; // wait until REST seed ready
-
-    let closed = false;
-    const stopPolling = () => {
-      if (pollTimerRef.current) {
-        try { clearInterval(pollTimerRef.current); } catch (e) {}
-        pollTimerRef.current = null;
-      }
-    };
-
-    const startPolling = () => {
-      if (pollTimerRef.current) return;
-      const qUp = (symbol || '').toString().replace(/[^A-Za-z0-9]/g, '').toUpperCase();
-      const intv = `${Number(minutes) || 1}m`;
-      const stepMs = 3000;
-      const pollOnce = async () => {
-        try {
-          const res = await fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=${qUp}&interval=${intv}&limit=2`);
-          if (!res.ok) return;
-          const data = await res.json();
-          if (!Array.isArray(data) || data.length === 0) return;
-          const last = data[data.length - 1];
-          const t = Number(last[0]);
-          const o = Number(last[1]);
-          const h = Number(last[2]);
-          const l = Number(last[3]);
-          const c = Number(last[4]);
-          const closeTime = Number(last[6]);
-          if (![t,o,h,l,c,closeTime].every(Number.isFinite)) return;
-          const isClosed = Date.now() >= closeTime;
-          // apply same update logic as WS
-          let { candles, emaS, emaL, emaSVal, emaLVal } = latestRef.current;
-          if (!candles || candles.length === 0) return;
-          const lastLocal = candles[candles.length - 1];
-          if (lastLocal && lastLocal.t === t) {
-            if (isClosed) {
-              const updated = { o, h, l, c, t };
-              const nextCandles = candles.slice(0, -1).concat(updated).slice(-200);
-              emaSVal = updateEMA(emaSVal ?? emaS[emaS.length - 1], c, emaShort);
-              emaLVal = updateEMA(emaLVal ?? emaL[emaL.length - 1], c, emaLong);
-              const nextES = [...emaS.slice(0, -1), emaSVal].slice(-200);
-              const nextEL = [...emaL.slice(0, -1), emaLVal].slice(-200);
-              latestRef.current = { candles: nextCandles, emaS: nextES, emaL: nextEL, emaSVal, emaLVal };
-              setPoints({ candles: nextCandles, emaS: nextES, emaL: nextEL });
-            } else {
-              const preview = { o, h, l, c, t };
-              const previewCandles = candles.slice(0, -1).concat(preview);
-              const prevES = emaS[emaS.length - 1];
-              const prevEL = emaL[emaL.length - 1];
-              const previewES = updateEMA(prevES, c, emaShort);
-              const previewEL = updateEMA(prevEL, c, emaLong);
-              setPoints({ candles: previewCandles, emaS: [...emaS.slice(0, -1), previewES], emaL: [...emaL.slice(0, -1), previewEL] });
-            }
-          } else {
-            if (isClosed) {
-              const nextCandles = [...candles, { o, h, l, c, t }].slice(-200);
-              emaSVal = updateEMA(emaSVal ?? emaS[emaS.length - 1], c, emaShort);
-              emaLVal = updateEMA(emaLVal ?? emaL[emaL.length - 1], c, emaLong);
-              const nextES = [...emaS, emaSVal].slice(-200);
-              const nextEL = [...emaL, emaLVal].slice(-200);
-              latestRef.current = { candles: nextCandles, emaS: nextES, emaL: nextEL, emaSVal, emaLVal };
-              setPoints({ candles: nextCandles, emaS: nextES, emaL: nextEL });
-            } else {
-              const previewCandles = [...candles, { o, h, l, c, t }].slice(-200);
-              const previewES = updateEMA(emaS[emaS.length - 1], c, emaShort);
-              const previewEL = updateEMA(emaL[emaL.length - 1], c, emaLong);
-              setPoints({ candles: previewCandles, emaS: [...emaS, previewES].slice(-200), emaL: [...emaL, previewEL].slice(-200) });
-            }
-          }
-        } catch (e) { /* ignore */ }
-      };
-      pollTimerRef.current = setInterval(pollOnce, stepMs);
-      // also kick once immediately so UI moves quickly
-      pollOnce();
-    };
 
     const connectWs = () => {
       if (closed) return;
@@ -301,7 +217,7 @@ const ChartBox = React.forwardRef(function ChartBox({ symbol, minutes = 1, emaSh
               const price = Number(root.p);
               const tradeTime = Number(root.T || root.E || Date.now());
               if (!Number.isFinite(price) || !Number.isFinite(tradeTime)) return;
-              let { candles, emaS, emaL } = latestRef.current;
+              let { candles } = latestRef.current;
               if (!candles || candles.length === 0) return;
               const last = candles[candles.length - 1];
               const m = Math.max(1, Number(minutes) || 1);
@@ -314,11 +230,7 @@ const ChartBox = React.forwardRef(function ChartBox({ symbol, minutes = 1, emaSh
                 const c = price;
                 const t = last.t;
                 const previewCandles = candles.slice(0, -1).concat({ o, h, l, c, t });
-                const prevES = emaS[emaS.length - 1];
-                const prevEL = emaL[emaL.length - 1];
-                const previewES = updateEMA(prevES, c, emaShort);
-                const previewEL = updateEMA(prevEL, c, emaLong);
-                setPoints({ candles: previewCandles, emaS: [...emaS.slice(0, -1), previewES], emaL: [...emaL.slice(0, -1), previewEL] });
+                recalcAndSet(previewCandles);
                 return;
               }
               // else ignore; kline event will open/close candles
@@ -331,43 +243,28 @@ const ChartBox = React.forwardRef(function ChartBox({ symbol, minutes = 1, emaSh
             const o = Number(k.o); const h = Number(k.h); const l = Number(k.l); const c = Number(k.c); const t = Number(k.t);
             const isClosed = !!k.x;
             if (![o,h,l,c,t].every(Number.isFinite)) return;
-            let { candles, emaS, emaL, emaSVal, emaLVal } = latestRef.current;
+            let { candles } = latestRef.current;
             if (!candles || candles.length === 0) return;
             const last = candles[candles.length - 1];
             if (last && last.t === t) {
               if (isClosed) {
                 const updated = { o, h, l, c, t };
                 const nextCandles = candles.slice(0, -1).concat(updated).slice(-200);
-                emaSVal = updateEMA(emaSVal ?? emaS[emaS.length - 1], c, emaShort);
-                emaLVal = updateEMA(emaLVal ?? emaL[emaL.length - 1], c, emaLong);
-                const nextES = [...emaS.slice(0, -1), emaSVal].slice(-200);
-                const nextEL = [...emaL.slice(0, -1), emaLVal].slice(-200);
-                latestRef.current = { candles: nextCandles, emaS: nextES, emaL: nextEL, emaSVal, emaLVal };
-                setPoints({ candles: nextCandles, emaS: nextES, emaL: nextEL });
+                recalcAndSet(nextCandles);
               } else {
-                const preview = { o, h, l, c, t };
-                const previewCandles = candles.slice(0, -1).concat(preview);
-                const prevES = emaS[emaS.length - 1];
-                const prevEL = emaL[emaL.length - 1];
-                const previewES = updateEMA(prevES, c, emaShort);
-                const previewEL = updateEMA(prevEL, c, emaLong);
-                setPoints({ candles: previewCandles, emaS: [...emaS.slice(0, -1), previewES], emaL: [...emaL.slice(0, -1), previewEL] });
+                const prev = candles[candles.length - 1];
+                const merged = { o: prev.o, h: Math.max(prev.h, h), l: Math.min(prev.l, l), c, t };
+                const previewCandles = candles.slice(0, -1).concat(merged);
+                recalcAndSet(previewCandles);
               }
             } else {
               if (isClosed) {
                 const nextCandles = [...candles, { o, h, l, c, t }].slice(-200);
-                emaSVal = updateEMA(emaSVal ?? emaS[emaS.length - 1], c, emaShort);
-                emaLVal = updateEMA(emaLVal ?? emaL[emaL.length - 1], c, emaLong);
-                const nextES = [...emaS, emaSVal].slice(-200);
-                const nextEL = [...emaL, emaLVal].slice(-200);
-                latestRef.current = { candles: nextCandles, emaS: nextES, emaL: nextEL, emaSVal, emaLVal };
-                setPoints({ candles: nextCandles, emaS: nextES, emaL: nextEL });
+                recalcAndSet(nextCandles);
               } else {
                 // new preview candle opened
                 const previewCandles = [...candles, { o, h, l, c, t }].slice(-200);
-                const previewES = updateEMA(emaS[emaS.length - 1], c, emaShort);
-                const previewEL = updateEMA(emaL[emaL.length - 1], c, emaLong);
-                setPoints({ candles: previewCandles, emaS: [...emaS, previewES].slice(-200), emaL: [...emaL, previewEL].slice(-200) });
+                recalcAndSet(previewCandles);
               }
             }
           } catch (e) {}
@@ -390,6 +287,8 @@ const ChartBox = React.forwardRef(function ChartBox({ symbol, minutes = 1, emaSh
         };
       } catch (e) {}
     };
+    // start polling immediately as a fallback while WS connects
+    startPolling();
     connectWs();
     return () => {
       closed = true;
@@ -397,28 +296,16 @@ const ChartBox = React.forwardRef(function ChartBox({ symbol, minutes = 1, emaSh
       if (watchdogTimerRef.current) { try { clearInterval(watchdogTimerRef.current); } catch (e) {} watchdogTimerRef.current = null; }
       stopPolling();
     };
-  }, [symbol, minutes, emaShort, emaLong, seedReady]);
+  }, [symbol, minutes, emaShort, emaLong, recalcAndSet, startPolling, stopPolling]);
 
   // Recompute EMA overlays immediately when periods change
   useEffect(() => {
     try {
       const { candles } = latestRef.current || {};
       if (!candles || candles.length === 0) return;
-      const closes = candles.map(c => c.c);
-      if (closes.length < Math.max(emaShort, emaLong)) return;
-      let es = calculateInitialEMA(closes.slice(0, emaShort), emaShort);
-      const emaSFull = [es];
-      for (let i = emaShort; i < closes.length; i++) { es = updateEMA(es, closes[i], emaShort); emaSFull.push(es); }
-      let el = calculateInitialEMA(closes.slice(0, emaLong), emaLong);
-      const emaLFull = [el];
-      for (let i = emaLong; i < closes.length; i++) { el = updateEMA(el, closes[i], emaLong); emaLFull.push(el); }
-      const align = closes.length - Math.max(emaShort, emaLong) + 1;
-      const emaSArr = emaSFull.slice(emaSFull.length - align);
-      const emaLArr = emaLFull.slice(emaLFull.length - align);
-      latestRef.current = { candles, emaS: emaSArr, emaL: emaLArr, emaSVal: emaSArr[emaSArr.length - 1], emaLVal: emaLArr[emaLArr.length - 1] };
-      setPoints({ candles, emaS: emaSArr, emaL: emaLArr });
+      recalcAndSet(candles);
     } catch (e) {}
-  }, [emaShort, emaLong]);
+  }, [emaShort, emaLong, recalcAndSet]);
 
   if (!points || !points.candles || points.candles.length === 0) {
     return (
