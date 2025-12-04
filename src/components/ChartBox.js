@@ -15,7 +15,9 @@ export default function ChartBox({ symbol, minutes = 1, emaShort = 9, emaLong = 
     if (!q) return;
     (async () => {
       try {
-        const res = await fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=${q}&interval=${interval}&limit=120`);
+        const need = Math.max(Number(emaShort) || 9, Number(emaLong) || 26) + 120;
+        const limit = Math.min(1000, Math.max(need, 300));
+        const res = await fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=${q}&interval=${interval}&limit=${limit}`);
         if (!res.ok) return;
         const data = await res.json();
         const candles = (data || []).map(k => ({
@@ -26,18 +28,29 @@ export default function ChartBox({ symbol, minutes = 1, emaShort = 9, emaLong = 
           setPoints({ candles, emaS: [], emaL: [] });
           return;
         }
+        // Build full EMA sequences then align both to the same tail length
         let es = calculateInitialEMA(closes.slice(0, emaShort), emaShort);
-        let el = calculateInitialEMA(closes.slice(0, emaLong), emaLong);
-        const emaSArr = [es];
-        const emaLArr = [el];
-        for (let i = Math.max(emaShort, emaLong); i < closes.length; i++) {
+        const emaSFull = [es];
+        for (let i = emaShort; i < closes.length; i++) {
           es = updateEMA(es, closes[i], emaShort);
-          el = updateEMA(el, closes[i], emaLong);
-          emaSArr.push(es);
-          emaLArr.push(el);
+          emaSFull.push(es);
         }
-        latestRef.current = { candles, emaS: emaSArr, emaL: emaLArr, emaSVal: emaSArr[emaSArr.length - 1], emaLVal: emaLArr[emaLArr.length - 1] };
-        setPoints({ candles, emaS: emaSArr, emaL: emaLArr });
+
+        let el = calculateInitialEMA(closes.slice(0, emaLong), emaLong);
+        const emaLFull = [el];
+        for (let i = emaLong; i < closes.length; i++) {
+          el = updateEMA(el, closes[i], emaLong);
+          emaLFull.push(el);
+        }
+
+        // Align to the same number of trailing points so both end on the latest candle
+        const align = closes.length - Math.max(emaShort, emaLong) + 1;
+        const emaSArr = emaSFull.slice(emaSFull.length - align);
+        const emaLArr = emaLFull.slice(emaLFull.length - align);
+        const alignedCandles = candles.slice(candles.length - align);
+
+        latestRef.current = { candles: alignedCandles, emaS: emaSArr, emaL: emaLArr, emaSVal: emaSArr[emaSArr.length - 1], emaLVal: emaLArr[emaLArr.length - 1] };
+        setPoints({ candles: alignedCandles, emaS: emaSArr, emaL: emaLArr });
       } catch (e) { setPoints(null); }
     })();
   }, [symbol, minutes, emaShort, emaLong]);
@@ -135,6 +148,8 @@ export default function ChartBox({ symbol, minutes = 1, emaShort = 9, emaLong = 
   const toPath = (arr) => arr.slice(Math.max(0, arr.length - viewCandles.length)).map((v, i) => `${i === 0 ? 'M' : 'L'} ${x(i)} ${y(v)}`).join(' ');
   const emaSPath = toPath(points.emaS.length ? points.emaS : closesForPath);
   const emaLPath = toPath(points.emaL.length ? points.emaL : closesForPath);
+  const lastEmaS = points.emaS.length ? points.emaS[points.emaS.length - 1] : null;
+  const lastEmaL = points.emaL.length ? points.emaL[points.emaL.length - 1] : null;
 
   return (
     <div className="chart-box">
@@ -160,8 +175,8 @@ export default function ChartBox({ symbol, minutes = 1, emaShort = 9, emaLong = 
         <path d={emaLPath} fill="none" stroke="#ef4444" strokeWidth="1.2" />
       </svg>
       <div className="chart-legend">
-        <span className="legend-item" style={{ color: '#10b981' }}>{`EMA${emaShort}`}</span>
-        <span className="legend-item" style={{ color: '#ef4444' }}>{`EMA${emaLong}`}</span>
+        <span className="legend-item" style={{ color: '#10b981' }}>{`EMA${emaShort}${lastEmaS!=null?`: ${lastEmaS.toFixed(2)}`:''}`}</span>
+        <span className="legend-item" style={{ color: '#ef4444' }}>{`EMA${emaLong}${lastEmaL!=null?`: ${lastEmaL.toFixed(2)}`:''}`}</span>
       </div>
     </div>
   );
