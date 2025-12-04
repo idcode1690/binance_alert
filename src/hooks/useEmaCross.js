@@ -49,6 +49,7 @@ export default function useEmaCross({ symbol = 'BTCUSDT', autoConnect = true, de
   const lastProcessedCloseRef = useRef(null); // timestamp (ms) of last processed closed candle
   const pollingTimerRef = useRef(null);
   const prevConfigRef = useRef({ interval, emaShort, emaLong });
+  const pendingConfigChangeRef = useRef(false);
 
   // Normalize interval strings for Binance API compatibility.
   // Binance accepts tokens like '1m','3m','5m','15m','30m','1h','2h','4h', etc.
@@ -533,9 +534,20 @@ export default function useEmaCross({ symbol = 'BTCUSDT', autoConnect = true, de
     try {
       const prev = prevConfigRef.current || {};
       const changed = prev.interval !== interval || prev.emaShort !== emaShort || prev.emaLong !== emaLong;
+      const isReady = Boolean(activeSymbol && currentSymbolRef.current);
+      // Record latest config immediately so repeated renders compare against the newest values
       prevConfigRef.current = { interval, emaShort, emaLong };
-      if (!changed) return;
-      if (!activeSymbol || !currentSymbolRef.current) return;
+
+      if (!changed && !pendingConfigChangeRef.current) return;
+
+      // If not ready yet (initializing), remember to apply once ready and exit early
+      if (!isReady) {
+        if (changed) pendingConfigChangeRef.current = true;
+        return;
+      }
+
+      // Ready: if there was a change or a pending change, apply reload now
+      pendingConfigChangeRef.current = false;
       setStatus('reloading');
       try {
         const ws = wsRef.current;

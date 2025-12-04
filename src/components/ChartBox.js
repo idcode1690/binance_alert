@@ -1,49 +1,18 @@
-import React, { useEffect, useImperativeHandle, useRef, useState, forwardRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { calculateInitialEMA, updateEMA } from '../utils/ema';
 
 // Render a live candlestick chart seeded from REST and updated via websocket,
 // with EMA overlays. Keeps desktop layout and mobile responsiveness intact.
-const ChartBox = ({ symbol, minutes = 1, emaShort = 9, emaLong = 26 }, ref) => {
+export default function ChartBox({ symbol, minutes = 1, emaShort = 9, emaLong = 26 }) {
   // points: { candles: [{o,h,l,c,t}], emaS: number[], emaL: number[] }
   const [points, setPoints] = useState(null);
-  const [seedReady, setSeedReady] = useState(false);
   const wsRef = useRef(null);
   const latestRef = useRef({ candles: [], emaS: [], emaL: [], emaSVal: null, emaLVal: null });
-  const reconnectRef = useRef({ attempt: 0, timer: null, hadMessage: false });
-  const svgRef = useRef(null);
-
-  // When EMA inputs change, recompute EMA arrays from current candles immediately
-  // so overlays reflect the new values without waiting for REST reseed timing.
-  useEffect(() => {
-    try {
-      const seeded = latestRef.current && Array.isArray(latestRef.current.candles) ? latestRef.current.candles : null;
-      if (!seeded || seeded.length === 0) return;
-      const closes = seeded.map(c => c.c).filter(Number.isFinite);
-      if (closes.length < Math.max(emaShort, emaLong)) {
-        latestRef.current = { candles: seeded, emaS: [], emaL: [], emaSVal: null, emaLVal: null };
-        setPoints(p => ({ candles: seeded, emaS: [], emaL: [] }));
-        return;
-      }
-      let es = calculateInitialEMA(closes.slice(0, emaShort), emaShort);
-      let el = calculateInitialEMA(closes.slice(0, emaLong), emaLong);
-      const emaSArr = [es];
-      const emaLArr = [el];
-      for (let i = Math.max(emaShort, emaLong); i < closes.length; i++) {
-        es = updateEMA(es, closes[i], emaShort);
-        el = updateEMA(el, closes[i], emaLong);
-        emaSArr.push(es);
-        emaLArr.push(el);
-      }
-      latestRef.current = { candles: seeded, emaS: emaSArr, emaL: emaLArr, emaSVal: emaSArr[emaSArr.length - 1], emaLVal: emaLArr[emaLArr.length - 1] };
-      setPoints(p => ({ candles: seeded, emaS: emaSArr, emaL: emaLArr }));
-    } catch (e) {}
-  }, [emaShort, emaLong]);
 
   useEffect(() => {
     const q = (symbol || '').toString().replace(/[^A-Za-z0-9]/g, '').toUpperCase();
     const interval = `${Number(minutes) || 1}m`;
     if (!q) return;
-    setSeedReady(false);
     (async () => {
       try {
         const res = await fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=${q}&interval=${interval}&limit=120`);
@@ -69,116 +38,74 @@ const ChartBox = ({ symbol, minutes = 1, emaShort = 9, emaLong = 26 }, ref) => {
         }
         latestRef.current = { candles, emaS: emaSArr, emaL: emaLArr, emaSVal: emaSArr[emaSArr.length - 1], emaLVal: emaLArr[emaLArr.length - 1] };
         setPoints({ candles, emaS: emaSArr, emaL: emaLArr });
-        setSeedReady(true);
       } catch (e) { setPoints(null); }
     })();
   }, [symbol, minutes, emaShort, emaLong]);
 
-  // Live updates via Binance futures websocket kline stream with auto-reconnect and endpoint fallback.
+  // Live updates via Binance futures websocket kline stream, mirroring Binance behavior.
   useEffect(() => {
-    if (!seedReady) return; // wait until REST seed is ready to avoid dropping early messages
     const q = (symbol || '').toString().replace(/[^A-Za-z0-9]/g, '').toLowerCase();
     const interval = `${Number(minutes) || 1}m`;
     if (!q) return;
     const stream = `${q}@kline_${interval}`;
-
-    let disposed = false;
-    const resetState = () => {
-      try {
-        if (wsRef.current) { wsRef.current.onopen = null; wsRef.current.onmessage = null; wsRef.current.onerror = null; wsRef.current.onclose = null; wsRef.current.close(); }
-      } catch (e) {}
-      wsRef.current = null;
-      if (reconnectRef.current.timer) { clearTimeout(reconnectRef.current.timer); reconnectRef.current.timer = null; }
-      reconnectRef.current.attempt = 0;
-      reconnectRef.current.hadMessage = false;
-    };
-
-    const endpoints = [
-      `wss://fstream.binance.com/ws/${stream}`,
-      `wss://fstream.binance.com/stream?streams=${stream}`
-    ];
-
-    const connectWS = (endpointIdx = 0) => {
-      if (disposed) return;
-      const url = endpoints[Math.min(endpointIdx, endpoints.length - 1)];
-      let switched = false;
-      try {
-        const ws = new WebSocket(url);
-        wsRef.current = ws;
-        ws.onopen = () => { reconnectRef.current.attempt = 0; };
-        ws.onmessage = (ev) => {
-          reconnectRef.current.hadMessage = true;
-          try {
-            const payload = JSON.parse(ev.data);
-            const k = payload.k || (payload.data && payload.data.k) || null;
-            if (!k) return;
-            const o = Number(k.o); const h = Number(k.h); const l = Number(k.l); const c = Number(k.c); const t = Number(k.t);
-            const isClosed = !!k.x; // true if candle closed
-            if (![o,h,l,c,t].every(Number.isFinite)) return;
-            let { candles, emaS, emaL, emaSVal, emaLVal } = latestRef.current;
-            if (!candles || candles.length === 0) return;
-            const last = candles[candles.length - 1];
-            if (last && last.t === t) {
-              if (isClosed) {
-                const updated = { o, h, l, c, t };
-                const nextCandles = candles.slice(0, -1).concat(updated).slice(-200);
-                emaSVal = updateEMA(emaSVal ?? emaS[emaS.length - 1], c, emaShort);
-                emaLVal = updateEMA(emaLVal ?? emaL[emaL.length - 1], c, emaLong);
-                const nextES = [...emaS.slice(0, -1), emaSVal].slice(-200);
-                const nextEL = [...emaL.slice(0, -1), emaLVal].slice(-200);
-                latestRef.current = { candles: nextCandles, emaS: nextES, emaL: nextEL, emaSVal, emaLVal };
-                setPoints({ candles: nextCandles, emaS: nextES, emaL: nextEL });
-              } else {
-                const preview = { o, h, l, c, t };
-                const previewCandles = candles.slice(0, -1).concat(preview);
-                const prevES = emaS[emaS.length - 1];
-                const prevEL = emaL[emaL.length - 1];
-                const previewES = updateEMA(prevES, c, emaShort);
-                const previewEL = updateEMA(prevEL, c, emaLong);
-                setPoints({ candles: previewCandles, emaS: [...emaS.slice(0, -1), previewES], emaL: [...emaL.slice(0, -1), previewEL] });
-              }
+    const url = `wss://fstream.binance.com/ws/${stream}`;
+    try {
+      const ws = new WebSocket(url);
+      wsRef.current = ws;
+      ws.onmessage = (ev) => {
+        try {
+          const payload = JSON.parse(ev.data);
+          const k = payload.k || (payload.data && payload.data.k) || null;
+          if (!k) return;
+          const o = Number(k.o); const h = Number(k.h); const l = Number(k.l); const c = Number(k.c); const t = Number(k.t);
+          const isClosed = !!k.x; // true if candle closed
+          if (![o,h,l,c,t].every(Number.isFinite)) return;
+          let { candles, emaS, emaL, emaSVal, emaLVal } = latestRef.current;
+          if (!candles || candles.length === 0) return;
+          const last = candles[candles.length - 1];
+          if (last && last.t === t) {
+            if (isClosed) {
+              const updated = { o, h, l, c, t };
+              const nextCandles = candles.slice(0, -1).concat(updated).slice(-200);
+              emaSVal = updateEMA(emaSVal ?? emaS[emaS.length - 1], c, emaShort);
+              emaLVal = updateEMA(emaLVal ?? emaL[emaL.length - 1], c, emaLong);
+              const nextES = [...emaS.slice(0, -1), emaSVal].slice(-200);
+              const nextEL = [...emaL.slice(0, -1), emaLVal].slice(-200);
+              latestRef.current = { candles: nextCandles, emaS: nextES, emaL: nextEL, emaSVal, emaLVal };
+              setPoints({ candles: nextCandles, emaS: nextES, emaL: nextEL });
             } else {
-              if (isClosed) {
-                const nextCandles = [...candles, { o, h, l, c, t }].slice(-200);
-                emaSVal = updateEMA(emaSVal ?? emaS[emaS.length - 1], c, emaShort);
-                emaLVal = updateEMA(emaLVal ?? emaL[emaL.length - 1], c, emaLong);
-                const nextES = [...emaS, emaSVal].slice(-200);
-                const nextEL = [...emaL, emaLVal].slice(-200);
-                latestRef.current = { candles: nextCandles, emaS: nextES, emaL: nextEL, emaSVal, emaLVal };
-                setPoints({ candles: nextCandles, emaS: nextES, emaL: nextEL });
-              } else {
-                // new preview candle opened
-                const previewCandles = [...candles, { o, h, l, c, t }].slice(-200);
-                const previewES = updateEMA(emaS[emaS.length - 1], c, emaShort);
-                const previewEL = updateEMA(emaL[emaL.length - 1], c, emaLong);
-                setPoints({ candles: previewCandles, emaS: [...emaS, previewES].slice(-200), emaL: [...emaL, previewEL].slice(-200) });
-              }
+              const preview = { o, h, l, c, t };
+              const previewCandles = candles.slice(0, -1).concat(preview);
+              const prevES = emaS[emaS.length - 1];
+              const prevEL = emaL[emaL.length - 1];
+              const previewES = updateEMA(prevES, c, emaShort);
+              const previewEL = updateEMA(prevEL, c, emaLong);
+              setPoints({ candles: previewCandles, emaS: [...emaS.slice(0, -1), previewES], emaL: [...emaL.slice(0, -1), previewEL] });
             }
-          } catch (e) {}
-        };
-        ws.onerror = () => {
-          // if no messages yet on this endpoint, try fallback endpoint immediately once
-          if (!switched && !reconnectRef.current.hadMessage && endpointIdx + 1 < endpoints.length) {
-            switched = true;
-            try { ws.close(); } catch (e) {}
-            connectWS(endpointIdx + 1);
+          } else {
+            if (isClosed) {
+              const nextCandles = [...candles, { o, h, l, c, t }].slice(-200);
+              emaSVal = updateEMA(emaSVal ?? emaS[emaS.length - 1], c, emaShort);
+              emaLVal = updateEMA(emaLVal ?? emaL[emaL.length - 1], c, emaLong);
+              const nextES = [...emaS, emaSVal].slice(-200);
+              const nextEL = [...emaL, emaLVal].slice(-200);
+              latestRef.current = { candles: nextCandles, emaS: nextES, emaL: nextEL, emaSVal, emaLVal };
+              setPoints({ candles: nextCandles, emaS: nextES, emaL: nextEL });
+            } else {
+              // new preview candle opened
+              const previewCandles = [...candles, { o, h, l, c, t }].slice(-200);
+              const previewES = updateEMA(emaS[emaS.length - 1], c, emaShort);
+              const previewEL = updateEMA(emaL[emaL.length - 1], c, emaLong);
+              setPoints({ candles: previewCandles, emaS: [...emaS, previewES].slice(-200), emaL: [...emaL, previewEL].slice(-200) });
+            }
           }
-        };
-        ws.onclose = () => {
-          if (disposed) return;
-          const attempt = ++reconnectRef.current.attempt;
-          const delay = Math.min(30000, 500 * Math.pow(2, attempt - 1));
-          reconnectRef.current.timer = setTimeout(() => {
-            reconnectRef.current.hadMessage = false;
-            connectWS(0); // retry from primary endpoint
-          }, delay);
-        };
-      } catch (e) {}
-    };
-
-    connectWS(0);
-    return () => { disposed = true; resetState(); };
-  }, [symbol, minutes, emaShort, emaLong, seedReady]);
+        } catch (e) {}
+      };
+      ws.onerror = () => {};
+      ws.onclose = () => {};
+    } catch (e) {}
+    return () => { try { if (wsRef.current) wsRef.current.close(); } catch (e) {} };
+  }, [symbol, minutes, emaShort, emaLong]);
 
   if (!points || !points.candles || points.candles.length === 0) {
     return (
@@ -211,7 +138,7 @@ const ChartBox = ({ symbol, minutes = 1, emaShort = 9, emaLong = 26 }, ref) => {
 
   return (
     <div className="chart-box">
-      <svg ref={svgRef} className="chart-svg" width="100%" height={h} viewBox={`0 0 ${w} ${h}`}>
+      <svg className="chart-svg" width="100%" height={h} viewBox={`0 0 ${w} ${h}`}>
         {viewCandles.map((c, i) => {
           const isUp = c.c >= c.o;
           const cx = x(i);
@@ -238,47 +165,4 @@ const ChartBox = ({ symbol, minutes = 1, emaShort = 9, emaLong = 26 }, ref) => {
       </div>
     </div>
   );
-};
-
-export default forwardRef(function ChartBoxWithRef(props, ref) {
-  const innerRef = useRef(null);
-
-  useImperativeHandle(ref, () => ({
-    async getSnapshotPng() {
-      try {
-        // Find svg element inside the rendered component
-        const host = (innerRef.current && innerRef.current.querySelector) ? innerRef.current : null;
-        const svg = host ? host.querySelector('svg.chart-svg') : null;
-        if (!svg) return null;
-        const serializer = new XMLSerializer();
-        const svgStr = serializer.serializeToString(svg);
-        const blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        try {
-          const img = new Image();
-          const vb = (svg.getAttribute('viewBox') || '0 0 800 200').split(/\s+/).map(Number);
-          const cw = (vb && vb.length === 4) ? vb[2] : 800;
-          const ch = (vb && vb.length === 4) ? vb[3] : 200;
-          await new Promise((res, rej) => {
-            img.onload = () => res();
-            img.onerror = (e) => rej(e);
-            img.src = url;
-          });
-          const canvas = document.createElement('canvas');
-          canvas.width = cw; canvas.height = ch;
-          const ctx = canvas.getContext('2d');
-          ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--bg') || '#0b0f14';
-          ctx.fillRect(0, 0, cw, ch);
-          ctx.drawImage(img, 0, 0);
-          const dataUrl = canvas.toDataURL('image/png');
-          return dataUrl;
-        } finally {
-          URL.revokeObjectURL(url);
-        }
-      } catch (e) { return null; }
-    }
-  }), []);
-
-  // Wrap original chart in a container div to allow querying its children
-  return <div ref={innerRef}><ChartBox {...props} /></div>;
-});
+}
