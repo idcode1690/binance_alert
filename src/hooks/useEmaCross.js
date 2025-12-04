@@ -353,10 +353,11 @@ export default function useEmaCross({ symbol = 'BTCUSDT', autoConnect = true, de
                   if (debug) console.debug('[useEmaCross] candidateConfirmed state', { candidateConfirmed: candidateConfirmedRef.current, candidateCount: candidateCountRef.current, required: confirmClosedCandles });
                   if (candidateCountRef.current >= confirmClosedCandles) {
                     if (prevConfirmedRef.current !== candidate) {
+                      const isActual = Boolean(detectedCross) || (prevConfirmedRef.current !== candidate);
                       prevConfirmedRef.current = candidate;
                       setConfirmedCross(candidate);
                       setConfirmedSource('ws');
-                      setConfirmedIsActualCross(Boolean(detectedCross));
+                      setConfirmedIsActualCross(isActual);
                       // also update public `cross` so UI reflects the closed-candle decision
                       if (prevCrossRef.current !== candidate) {
                         prevCrossRef.current = candidate;
@@ -479,10 +480,11 @@ export default function useEmaCross({ symbol = 'BTCUSDT', autoConnect = true, de
                     }
                     if (candidateCountRef.current >= confirmClosedCandles) {
                       if (prevConfirmedRef.current !== detectedCross) {
+                        const isActual = true;
                         prevConfirmedRef.current = detectedCross;
                         setConfirmedCross(detectedCross);
                         setConfirmedSource('poll');
-                        setConfirmedIsActualCross(true);
+                        setConfirmedIsActualCross(isActual);
                         if (prevCrossRef.current !== detectedCross) {
                           prevCrossRef.current = detectedCross;
                           setCross(detectedCross);
