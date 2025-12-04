@@ -1,8 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { calculateInitialEMA, updateEMA } from '../utils/ema';
 
 export default function ChartBox({ symbol, minutes = 1, emaShort = 9, emaLong = 26 }) {
   const [points, setPoints] = useState(null); // { closes:[], emaS:[], emaL:[] }
+  const wsRef = useRef(null);
+  const latestRef = useRef({ closes: [], emaS: [], emaL: [], emaSVal: null, emaLVal: null });
 
   useEffect(() => {
     const q = (symbol || '').toString().replace(/[^A-Za-z0-9]/g, '').toUpperCase();
@@ -25,9 +27,58 @@ export default function ChartBox({ symbol, minutes = 1, emaShort = 9, emaLong = 
           emaSArr.push(emaS);
           emaLArr.push(emaL);
         }
+        latestRef.current = { closes, emaS: emaSArr, emaL: emaLArr, emaSVal: emaSArr[emaSArr.length - 1], emaLVal: emaLArr[emaLArr.length - 1] };
         setPoints({ closes, emaS: emaSArr, emaL: emaLArr });
       } catch (e) { setPoints(null); }
     })();
+  }, [symbol, minutes, emaShort, emaLong]);
+
+  // Live updates via Binance futures websocket kline stream, mirroring Binance behavior.
+  useEffect(() => {
+    const q = (symbol || '').toString().replace(/[^A-Za-z0-9]/g, '').toLowerCase();
+    const interval = `${Number(minutes) || 1}m`;
+    if (!q) return;
+    const stream = `${q}@kline_${interval}`;
+    const url = `wss://fstream.binance.com/ws/${stream}`;
+    try {
+      const ws = new WebSocket(url);
+      wsRef.current = ws;
+      ws.onmessage = (ev) => {
+        try {
+          const payload = JSON.parse(ev.data);
+          const k = payload.k || (payload.data && payload.data.k) || null;
+          if (!k) return;
+          const close = Number(k.c);
+          const isClosed = !!k.x; // true if candle closed
+          if (!Number.isFinite(close)) return;
+          let { closes, emaS, emaL, emaSVal, emaLVal } = latestRef.current;
+          if (!closes || closes.length === 0) return;
+          if (isClosed) {
+            closes = [...closes, close].slice(-200);
+            emaSVal = updateEMA(emaSVal ?? emaS[emaS.length - 1], close, emaShort);
+            emaLVal = updateEMA(emaLVal ?? emaL[emaL.length - 1], close, emaLong);
+            emaS = [...emaS, emaSVal].slice(-200);
+            emaL = [...emaL, emaLVal].slice(-200);
+          } else {
+            const lastIdx = closes.length - 1;
+            const previewCloses = closes.slice();
+            previewCloses[lastIdx] = close;
+            const prevES = emaS[emaS.length - 1];
+            const prevEL = emaL[emaL.length - 1];
+            const previewES = updateEMA(prevES, close, emaShort);
+            const previewEL = updateEMA(prevEL, close, emaLong);
+            latestRef.current = { closes, emaS, emaL, emaSVal, emaLVal };
+            setPoints({ closes: previewCloses, emaS: [...emaS.slice(0, -1), previewES], emaL: [...emaL.slice(0, -1), previewEL] });
+            return;
+          }
+          latestRef.current = { closes, emaS, emaL, emaSVal, emaLVal };
+          setPoints({ closes, emaS, emaL });
+        } catch (e) {}
+      };
+      ws.onerror = () => {};
+      ws.onclose = () => {};
+    } catch (e) {}
+    return () => { try { if (wsRef.current) wsRef.current.close(); } catch (e) {} };
   }, [symbol, minutes, emaShort, emaLong]);
 
   if (!points || !points.closes || points.closes.length === 0) {
