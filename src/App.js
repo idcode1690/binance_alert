@@ -674,7 +674,7 @@ function App() {
             {/* lightweight monitor badges */}
             <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
               <div className="monitor-badge">{`${monitorMinutes}m · EMA${monitorEma1}/${monitorEma2}`}</div>
-              <div className="monitor-badge" title="Confirmed cross direction">{`Confirmed: ${confirmedCross || '—'}`}</div>
+              {/* removed confirmed cross direction badge per user request */}
             </div>
             {/* Notes moved below Alerts */}
 
