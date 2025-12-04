@@ -174,12 +174,12 @@ async function handleSendAlert(request, env) {
       console.log(JSON.stringify(safe));
     } catch (e) {}
 
-    // Workaround: Some environments see 404 with JSON POST; try GET with query params
+    // If image provided (data URL or base64), prefer sendPhoto with caption
     const useToken = bodyJson.token ? String(bodyJson.token) : botToken;
-    const base = `https://api.telegram.org/bot${useToken}/sendMessage`;
-    const url = `${base}?chat_id=${encodeURIComponent(chatId)}&text=${encodeURIComponent(text)}`;
+    const apiBase = `https://api.telegram.org/bot${useToken}`;
+    const imageData = (typeof bodyJson.image === 'string' && bodyJson.image.length > 32) ? String(bodyJson.image) : null;
 
-    // Dedupe within 30s by chatId+text to avoid duplicates
+    // Dedupe within 30s by chatId+text to avoid duplicates (ignore image content for dedupe)
     const dedupeKey = `${String(chatId)}|${text}`;
     if (dedupeCheck(dedupeKey, 30000)) {
       return new Response(JSON.stringify({ ok: true, skippedDuplicate: true, sent: null }), {
@@ -192,14 +192,35 @@ async function handleSendAlert(request, env) {
     let attempt = 0;
     let last = null;
     while (attempt <= maxRetries) {
-      const tgResp = await fetch(url, { method: 'GET' });
-      const result = await tgResp.json().catch(() => null);
+      let tgResp, result;
+      if (imageData) {
+        // Prepare multipart form for sendPhoto
+        try {
+          let mime = 'image/png'; let base64 = imageData;
+          const m = imageData.match(/^data:(.*?);base64,(.*)$/);
+          if (m) { mime = m[1] || 'image/png'; base64 = m[2] || ''; }
+          const bin = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+          const fd = new FormData();
+          fd.append('chat_id', String(chatId));
+          fd.append('caption', text);
+          fd.append('photo', new Blob([bin.buffer], { type: mime }), `chart.${mime.includes('jpeg')?'jpg':mime.includes('png')?'png':'bin'}`);
+          tgResp = await fetch(`${apiBase}/sendPhoto`, { method: 'POST', body: fd });
+        } catch (e) {
+          // Fallback to sendMessage on error constructing multipart
+          tgResp = await fetch(`${apiBase}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, text }) });
+        }
+        result = await tgResp.json().catch(() => null);
+      } else {
+        // sendMessage default (POST JSON for reliability)
+        tgResp = await fetch(`${apiBase}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, text }) });
+        result = await tgResp.json().catch(() => null);
+      }
       if (tgResp.ok && result && result.ok) {
-        return new Response(JSON.stringify({ ok: true, sent: text, telegram: result }), {
+        return new Response(JSON.stringify({ ok: true, sent: text, hasImage: !!imageData, telegram: result }), {
           status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders() },
         });
       }
-      last = { status: tgResp.status, detail: result, url };
+      last = { status: tgResp.status, detail: result };
       if (tgResp.status >= 500 || tgResp.status === 429) {
         // backoff
         await new Promise(r => setTimeout(r, 300 * (attempt + 1)));

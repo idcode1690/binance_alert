@@ -1,15 +1,16 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useImperativeHandle, useRef, useState, forwardRef } from 'react';
 import { calculateInitialEMA, updateEMA } from '../utils/ema';
 
 // Render a live candlestick chart seeded from REST and updated via websocket,
 // with EMA overlays. Keeps desktop layout and mobile responsiveness intact.
-export default function ChartBox({ symbol, minutes = 1, emaShort = 9, emaLong = 26 }) {
+const ChartBox = ({ symbol, minutes = 1, emaShort = 9, emaLong = 26 }, ref) => {
   // points: { candles: [{o,h,l,c,t}], emaS: number[], emaL: number[] }
   const [points, setPoints] = useState(null);
   const [seedReady, setSeedReady] = useState(false);
   const wsRef = useRef(null);
   const latestRef = useRef({ candles: [], emaS: [], emaL: [], emaSVal: null, emaLVal: null });
   const reconnectRef = useRef({ attempt: 0, timer: null, hadMessage: false });
+  const svgRef = useRef(null);
 
   // When EMA inputs change, recompute EMA arrays from current candles immediately
   // so overlays reflect the new values without waiting for REST reseed timing.
@@ -210,7 +211,7 @@ export default function ChartBox({ symbol, minutes = 1, emaShort = 9, emaLong = 
 
   return (
     <div className="chart-box">
-      <svg className="chart-svg" width="100%" height={h} viewBox={`0 0 ${w} ${h}`}>
+      <svg ref={svgRef} className="chart-svg" width="100%" height={h} viewBox={`0 0 ${w} ${h}`}>
         {viewCandles.map((c, i) => {
           const isUp = c.c >= c.o;
           const cx = x(i);
@@ -237,4 +238,47 @@ export default function ChartBox({ symbol, minutes = 1, emaShort = 9, emaLong = 
       </div>
     </div>
   );
-}
+};
+
+export default forwardRef(function ChartBoxWithRef(props, ref) {
+  const innerRef = useRef(null);
+
+  useImperativeHandle(ref, () => ({
+    async getSnapshotPng() {
+      try {
+        // Find svg element inside the rendered component
+        const host = (innerRef.current && innerRef.current.querySelector) ? innerRef.current : null;
+        const svg = host ? host.querySelector('svg.chart-svg') : null;
+        if (!svg) return null;
+        const serializer = new XMLSerializer();
+        const svgStr = serializer.serializeToString(svg);
+        const blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        try {
+          const img = new Image();
+          const vb = (svg.getAttribute('viewBox') || '0 0 800 200').split(/\s+/).map(Number);
+          const cw = (vb && vb.length === 4) ? vb[2] : 800;
+          const ch = (vb && vb.length === 4) ? vb[3] : 200;
+          await new Promise((res, rej) => {
+            img.onload = () => res();
+            img.onerror = (e) => rej(e);
+            img.src = url;
+          });
+          const canvas = document.createElement('canvas');
+          canvas.width = cw; canvas.height = ch;
+          const ctx = canvas.getContext('2d');
+          ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--bg') || '#0b0f14';
+          ctx.fillRect(0, 0, cw, ch);
+          ctx.drawImage(img, 0, 0);
+          const dataUrl = canvas.toDataURL('image/png');
+          return dataUrl;
+        } finally {
+          URL.revokeObjectURL(url);
+        }
+      } catch (e) { return null; }
+    }
+  }), []);
+
+  // Wrap original chart in a container div to allow querying its children
+  return <div ref={innerRef}><ChartBox {...props} /></div>;
+});

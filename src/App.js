@@ -38,6 +38,7 @@ function beep() {
 }
 
 function App() {
+    const chartRef = useRef(null);
   const [symbol, setSymbol] = useState(() => {
     try {
       const raw = localStorage.getItem('lastSymbol');
@@ -584,7 +585,13 @@ function App() {
         // payload는 evObj 기반으로 구성
         // Only send Telegram when a real crossing occurred
         if (!confirmedIsActualCross) return;
-        const payload = { symbol: evObj.symbol, price: (typeof priceToUse==='number'?priceToUse:evObj.price), message: type + ' @ ' + (typeof priceToUse==='number'?priceToUse:evObj.price), emaShort: monitorEma1, emaLong: monitorEma2, confirmed: true };
+        let image = null;
+        try {
+          if (chartRef.current && typeof chartRef.current.getSnapshotPng === 'function') {
+            image = await chartRef.current.getSnapshotPng();
+          }
+        } catch (e) { image = null; }
+        const payload = { symbol: evObj.symbol, price: (typeof priceToUse==='number'?priceToUse:evObj.price), message: type + ' @ ' + (typeof priceToUse==='number'?priceToUse:evObj.price), emaShort: monitorEma1, emaLong: monitorEma2, confirmed: true, image };
         try { if (showDebug) console.debug('[App] confirmedCross preparing /send-alert after event add', { serverUrl, payload }); } catch (e) {}
         const maxAttempts = 3; let attempt = 0; let lastError = null;
         while (attempt < maxAttempts) {
@@ -674,7 +681,7 @@ function App() {
             </div>
             {/* Place chart below the trades+metrics row */}
             <div style={{ marginTop: 8 }}>
-              <ChartBox symbol={symbol} minutes={monitorMinutes} emaShort={monitorEma1} emaLong={monitorEma2} />
+              <ChartBox ref={chartRef} symbol={symbol} minutes={monitorMinutes} emaShort={monitorEma1} emaLong={monitorEma2} />
             </div>
             {/* monitor badges removed per request */}
             {/* Notes moved below Alerts */}
