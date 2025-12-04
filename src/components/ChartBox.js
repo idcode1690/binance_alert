@@ -4,6 +4,7 @@ import { calculateInitialEMA, updateEMA } from '../utils/ema';
 // Render a live candlestick chart seeded from REST and updated via websocket,
 // with EMA overlays. Keeps desktop layout and mobile responsiveness intact.
 const ChartBox = React.forwardRef(function ChartBox({ symbol, minutes = 1, emaShort = 9, emaLong = 26 }, ref) {
+  const MAX_HISTORY = 1000;
   const [points, setPoints] = useState(null);
   const wsRef = useRef(null);
   const latestRef = useRef({ candles: [], emaS: [], emaL: [], emaSVal: null, emaLVal: null });
@@ -24,11 +25,12 @@ const ChartBox = React.forwardRef(function ChartBox({ symbol, minutes = 1, emaSh
 
   const recalcAndSet = useCallback((candles) => {
     try {
-      const closes = (candles || []).map(c => c.c);
+      const full = (candles || []).slice(-MAX_HISTORY);
+      const closes = full.map(c => c.c);
       const need = Math.max(Number(emaShort) || 9, Number(emaLong) || 26);
       if (!closes.length || closes.length < need) {
-        latestRef.current = { candles: candles || [], emaS: [], emaL: [], emaSVal: null, emaLVal: null };
-        setPoints({ candles: candles || [], emaS: [], emaL: [] });
+        latestRef.current = { candles: full, emaS: [], emaL: [], emaSVal: null, emaLVal: null };
+        setPoints({ candles: full, emaS: [], emaL: [] });
         return;
       }
       let es = calculateInitialEMA(closes.slice(0, emaShort), emaShort);
@@ -40,9 +42,8 @@ const ChartBox = React.forwardRef(function ChartBox({ symbol, minutes = 1, emaSh
       const align = Math.max(1, closes.length - Math.max(emaShort, emaLong) + 1);
       const emaSArr = emaSFull.slice(emaSFull.length - align);
       const emaLArr = emaLFull.slice(emaLFull.length - align);
-      const alignedCandles = (candles || []).slice(Math.max(0, (candles?.length || 0) - align));
-      latestRef.current = { candles: alignedCandles, emaS: emaSArr, emaL: emaLArr, emaSVal: emaSArr[emaSArr.length - 1], emaLVal: emaLArr[emaLArr.length - 1] };
-      setPoints({ candles: alignedCandles, emaS: emaSArr, emaL: emaLArr });
+      latestRef.current = { candles: full, emaS: emaSArr, emaL: emaLArr, emaSVal: emaSArr[emaSArr.length - 1], emaLVal: emaLArr[emaLArr.length - 1] };
+      setPoints({ candles: full, emaS: emaSArr, emaL: emaLArr });
     } catch (e) {}
   }, [emaShort, emaLong]);
 
@@ -71,7 +72,7 @@ const ChartBox = React.forwardRef(function ChartBox({ symbol, minutes = 1, emaSh
         const lastLocal = candles[candles.length - 1];
         if (lastLocal && lastLocal.t === t) {
           if (isClosed) {
-            const nextCandles = candles.slice(0, -1).concat({ o, h, l, c, t }).slice(-200);
+            const nextCandles = candles.slice(0, -1).concat({ o, h, l, c, t }).slice(-MAX_HISTORY);
             recalcAndSet(nextCandles);
           } else {
             const prev = candles[candles.length - 1];
@@ -81,10 +82,10 @@ const ChartBox = React.forwardRef(function ChartBox({ symbol, minutes = 1, emaSh
           }
         } else {
           if (isClosed) {
-            const nextCandles = [...candles, { o, h, l, c, t }].slice(-200);
+            const nextCandles = [...candles, { o, h, l, c, t }].slice(-MAX_HISTORY);
             recalcAndSet(nextCandles);
           } else {
-            const previewCandles = [...candles, { o, h, l, c, t }].slice(-200);
+            const previewCandles = [...candles, { o, h, l, c, t }].slice(-MAX_HISTORY);
             recalcAndSet(previewCandles);
           }
         }
@@ -171,10 +172,10 @@ const ChartBox = React.forwardRef(function ChartBox({ symbol, minutes = 1, emaSh
         const align = closes.length - Math.max(emaShort, emaLong) + 1;
         const emaSArr = emaSFull.slice(emaSFull.length - align);
         const emaLArr = emaLFull.slice(emaLFull.length - align);
-        const alignedCandles = candles.slice(candles.length - align);
+        const fullCandles = candles.slice(-MAX_HISTORY);
 
-        latestRef.current = { candles: alignedCandles, emaS: emaSArr, emaL: emaLArr, emaSVal: emaSArr[emaSArr.length - 1], emaLVal: emaLArr[emaLArr.length - 1] };
-        setPoints({ candles: alignedCandles, emaS: emaSArr, emaL: emaLArr });
+        latestRef.current = { candles: fullCandles, emaS: emaSArr, emaL: emaLArr, emaSVal: emaSArr[emaSArr.length - 1], emaLVal: emaLArr[emaLArr.length - 1] };
+        setPoints({ candles: fullCandles, emaS: emaSArr, emaL: emaLArr });
         
         // reset reconnect attempts on fresh seed
         reconnectAttemptsRef.current = 0;
@@ -265,7 +266,7 @@ const ChartBox = React.forwardRef(function ChartBox({ symbol, minutes = 1, emaSh
             if (last && last.t === t) {
               if (isClosed) {
                 const updated = { o, h, l, c, t };
-                const nextCandles = candles.slice(0, -1).concat(updated).slice(-200);
+                const nextCandles = candles.slice(0, -1).concat(updated).slice(-MAX_HISTORY);
                 recalcAndSet(nextCandles);
               } else {
                 const prev = candles[candles.length - 1];
@@ -275,11 +276,11 @@ const ChartBox = React.forwardRef(function ChartBox({ symbol, minutes = 1, emaSh
               }
             } else {
               if (isClosed) {
-                const nextCandles = [...candles, { o, h, l, c, t }].slice(-200);
+                const nextCandles = [...candles, { o, h, l, c, t }].slice(-MAX_HISTORY);
                 recalcAndSet(nextCandles);
               } else {
                 // new preview candle opened
-                const previewCandles = [...candles, { o, h, l, c, t }].slice(-200);
+                const previewCandles = [...candles, { o, h, l, c, t }].slice(-MAX_HISTORY);
                 recalcAndSet(previewCandles);
               }
             }
