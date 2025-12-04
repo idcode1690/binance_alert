@@ -11,6 +11,9 @@ const ChartBox = React.forwardRef(function ChartBox({ symbol, minutes = 1, emaSh
   const seedReadyRef = useRef(false);
   const reconnectAttemptsRef = useRef(0);
   const containerRef = useRef(null);
+  const lastActivityRef = useRef(0);
+  const watchdogTimerRef = useRef(null);
+  const wsModeRef = useRef('single'); // 'single' uses /ws, 'combined' uses /stream?streams=
   // Expose snapshot method before any early returns
   useImperativeHandle(ref, () => ({
     async getSnapshotPng() {
@@ -53,6 +56,8 @@ const ChartBox = React.forwardRef(function ChartBox({ symbol, minutes = 1, emaSh
     const q = (symbol || '').toString().replace(/[^A-Za-z0-9]/g, '').toUpperCase();
     const interval = `${Number(minutes) || 1}m`;
     if (!q) return;
+    // reset seed gate when starting a new seed
+    seedReadyRef.current = false;
     (async () => {
       try {
         const need = Math.max(Number(emaShort) || 9, Number(emaLong) || 26) + 120;
@@ -92,6 +97,9 @@ const ChartBox = React.forwardRef(function ChartBox({ symbol, minutes = 1, emaSh
         latestRef.current = { candles: alignedCandles, emaS: emaSArr, emaL: emaLArr, emaSVal: emaSArr[emaSArr.length - 1], emaLVal: emaLArr[emaLArr.length - 1] };
         setPoints({ candles: alignedCandles, emaS: emaSArr, emaL: emaLArr });
         seedReadyRef.current = true;
+        // reset reconnect attempts on fresh seed
+        reconnectAttemptsRef.current = 0;
+        lastActivityRef.current = Date.now();
       } catch (e) { setPoints(null); }
     })();
   }, [symbol, minutes, emaShort, emaLong]);
@@ -107,15 +115,34 @@ const ChartBox = React.forwardRef(function ChartBox({ symbol, minutes = 1, emaSh
     const connectWs = () => {
       if (closed) return;
       try {
-        const url = `wss://fstream.binance.com/ws/${q}@kline_${interval}`;
+        const stream = `${q}@kline_${interval}`;
+        const mode = wsModeRef.current || 'single';
+        const url = mode === 'combined'
+          ? `wss://fstream.binance.com/stream?streams=${stream}`
+          : `wss://fstream.binance.com/ws/${stream}`;
         const ws = new WebSocket(url);
         wsRef.current = ws;
-        ws.onopen = () => { reconnectAttemptsRef.current = 0; };
+        ws.onopen = () => {
+          reconnectAttemptsRef.current = 0;
+          lastActivityRef.current = Date.now();
+          // start or reset watchdog
+          if (watchdogTimerRef.current) { try { clearInterval(watchdogTimerRef.current); } catch (e) {} watchdogTimerRef.current = null; }
+          watchdogTimerRef.current = setInterval(() => {
+            try {
+              const idleMs = Date.now() - (lastActivityRef.current || 0);
+              // if no messages for 45s, force reconnect
+              if (idleMs > 45000) {
+                if (wsRef.current) { try { wsRef.current.close(); } catch (e) {} }
+              }
+            } catch (e) {}
+          }, 15000);
+        };
         ws.onmessage = (ev) => {
           try {
             const payload = JSON.parse(ev.data);
             const k = payload.k || (payload.data && payload.data.k) || null;
             if (!k) return;
+            lastActivityRef.current = Date.now();
             const o = Number(k.o); const h = Number(k.h); const l = Number(k.l); const c = Number(k.c); const t = Number(k.t);
             const isClosed = !!k.x;
             if (![o,h,l,c,t].every(Number.isFinite)) return;
@@ -163,9 +190,15 @@ const ChartBox = React.forwardRef(function ChartBox({ symbol, minutes = 1, emaSh
         ws.onerror = () => {};
         ws.onclose = () => {
           if (closed) return;
+          // stop watchdog
+          if (watchdogTimerRef.current) { try { clearInterval(watchdogTimerRef.current); } catch (e) {} watchdogTimerRef.current = null; }
           const attempt = reconnectAttemptsRef.current || 0;
           const backoff = Math.min(30000, 1000 * Math.pow(2, attempt));
           reconnectAttemptsRef.current = attempt + 1;
+          // toggle mode after a few failed attempts to increase chances
+          if (reconnectAttemptsRef.current >= 2) {
+            wsModeRef.current = (wsModeRef.current === 'single') ? 'combined' : 'single';
+          }
           setTimeout(connectWs, backoff);
         };
       } catch (e) {}
@@ -174,6 +207,7 @@ const ChartBox = React.forwardRef(function ChartBox({ symbol, minutes = 1, emaSh
     return () => {
       closed = true;
       try { if (wsRef.current) wsRef.current.close(); } catch (e) {}
+      if (watchdogTimerRef.current) { try { clearInterval(watchdogTimerRef.current); } catch (e) {} watchdogTimerRef.current = null; }
     };
   }, [symbol, minutes, emaShort, emaLong]);
 
