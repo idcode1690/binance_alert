@@ -14,6 +14,7 @@ const ChartBox = React.forwardRef(function ChartBox({ symbol, minutes = 1, emaSh
   const watchdogTimerRef = useRef(null);
   const wsModeRef = useRef('combined');
   const pollTimerRef = useRef(null);
+  const hadActivityRef = useRef(false);
   
 
   const stopPolling = useCallback(() => {
@@ -193,15 +194,18 @@ const ChartBox = React.forwardRef(function ChartBox({ symbol, minutes = 1, emaSh
         ws.onopen = () => {
           reconnectAttemptsRef.current = 0;
           lastActivityRef.current = Date.now();
-          // stop REST polling once WS is active
-          stopPolling();
+          hadActivityRef.current = false;
           // start or reset watchdog
           if (watchdogTimerRef.current) { try { clearInterval(watchdogTimerRef.current); } catch (e) {} watchdogTimerRef.current = null; }
           watchdogTimerRef.current = setInterval(() => {
             try {
               const idleMs = Date.now() - (lastActivityRef.current || 0);
-              // if no messages for 45s, force reconnect
-              if (idleMs > 45000) {
+              // if idle > 10s, ensure REST polling is running as fallback
+              if (idleMs > 10000) {
+                startPolling();
+              }
+              // if no messages for 30s, force reconnect
+              if (idleMs > 30000) {
                 if (wsRef.current) { try { wsRef.current.close(); } catch (e) {} }
               }
             } catch (e) {}
@@ -211,9 +215,15 @@ const ChartBox = React.forwardRef(function ChartBox({ symbol, minutes = 1, emaSh
           try {
             const payload = JSON.parse(ev.data);
             const root = payload.data || payload;
+            // mark activity and stop polling (WS is providing data)
+            lastActivityRef.current = Date.now();
+            if (!hadActivityRef.current) {
+              hadActivityRef.current = true;
+            }
+            // whenever we receive any message, we can stop REST polling
+            stopPolling();
             // Handle aggTrade updates to keep the preview candle moving smoothly
             if (root && (root.e === 'aggTrade' || root.stream?.endsWith('@aggTrade'))) {
-              lastActivityRef.current = Date.now();
               const price = Number(root.p);
               const tradeTime = Number(root.T || root.E || Date.now());
               if (!Number.isFinite(price) || !Number.isFinite(tradeTime)) return;
@@ -239,7 +249,6 @@ const ChartBox = React.forwardRef(function ChartBox({ symbol, minutes = 1, emaSh
             // Handle kline payloads (single or combined)
             const k = root.k || null;
             if (!k) return;
-            lastActivityRef.current = Date.now();
             const o = Number(k.o); const h = Number(k.h); const l = Number(k.l); const c = Number(k.c); const t = Number(k.t);
             const isClosed = !!k.x;
             if (![o,h,l,c,t].every(Number.isFinite)) return;
