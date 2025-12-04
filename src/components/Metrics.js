@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import TradesBox from './TradesBox';
+import ChartBox from './ChartBox';
 
 function formatNumberForDisplay(v) {
   if (typeof v !== 'number' || Number.isNaN(v)) return '—';
@@ -9,7 +10,7 @@ function formatNumberForDisplay(v) {
   return v.toFixed(2);
 }
 
-export default function Metrics({ activeSymbol, symbol, lastPrice, lastTick, lastCandleClosed, cross, confirmedCross, ema9, ema26, monitorEma1 = 9, monitorEma2 = 26 }) {
+export default function Metrics({ activeSymbol, symbol, lastPrice, lastTick, lastCandleClosed, cross, confirmedCross, ema9, ema26, monitorEma1 = 9, monitorEma2 = 26, monitorMinutes = 1 }) {
   const displayPrice = (activeSymbol === symbol)
     ? (typeof lastTick !== 'undefined' && lastTick !== null ? formatNumberForDisplay(lastTick) : (lastPrice != null ? formatNumberForDisplay(lastPrice) : '—'))
     : '—';
@@ -179,6 +180,9 @@ export default function Metrics({ activeSymbol, symbol, lastPrice, lastTick, las
       </div>
       <div className="metrics-right">
         <TradesBox symbol={symbol} />
+        <div style={{ marginTop: 8 }}>
+          <ChartBox symbol={symbol} minutes={monitorMinutes} emaShort={monitorEma1} emaLong={monitorEma2} />
+        </div>
       </div>
     </div>
   );

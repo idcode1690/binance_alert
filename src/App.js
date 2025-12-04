@@ -669,7 +669,7 @@ function App() {
                 showToast={showToast}
               />
             <div style={{ marginTop: 12 }}>
-              <Metrics activeSymbol={activeSymbol} symbol={symbol} lastPrice={lastPrice} lastTick={lastTick} lastCandleClosed={lastCandleClosed} cross={cross} confirmedCross={confirmedCross} ema9={ema9} ema26={ema26} monitorEma1={monitorEma1} monitorEma2={monitorEma2} />
+              <Metrics activeSymbol={activeSymbol} symbol={symbol} lastPrice={lastPrice} lastTick={lastTick} lastCandleClosed={lastCandleClosed} cross={cross} confirmedCross={confirmedCross} ema9={ema9} ema26={ema26} monitorEma1={monitorEma1} monitorEma2={monitorEma2} monitorMinutes={monitorMinutes} />
             </div>
             {/* monitor badges removed per request */}
             {/* Notes moved below Alerts */}
