@@ -6,6 +6,7 @@ import { calculateInitialEMA, updateEMA } from '../utils/ema';
 export default function ChartBox({ symbol, minutes = 1, emaShort = 9, emaLong = 26 }) {
   // points: { candles: [{o,h,l,c,t}], emaS: number[], emaL: number[] }
   const [points, setPoints] = useState(null);
+  const [seedReady, setSeedReady] = useState(false);
   const wsRef = useRef(null);
   const latestRef = useRef({ candles: [], emaS: [], emaL: [], emaSVal: null, emaLVal: null });
   const reconnectRef = useRef({ attempt: 0, timer: null, hadMessage: false });
@@ -41,6 +42,7 @@ export default function ChartBox({ symbol, minutes = 1, emaShort = 9, emaLong = 
     const q = (symbol || '').toString().replace(/[^A-Za-z0-9]/g, '').toUpperCase();
     const interval = `${Number(minutes) || 1}m`;
     if (!q) return;
+    setSeedReady(false);
     (async () => {
       try {
         const res = await fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=${q}&interval=${interval}&limit=120`);
@@ -66,12 +68,14 @@ export default function ChartBox({ symbol, minutes = 1, emaShort = 9, emaLong = 
         }
         latestRef.current = { candles, emaS: emaSArr, emaL: emaLArr, emaSVal: emaSArr[emaSArr.length - 1], emaLVal: emaLArr[emaLArr.length - 1] };
         setPoints({ candles, emaS: emaSArr, emaL: emaLArr });
+        setSeedReady(true);
       } catch (e) { setPoints(null); }
     })();
   }, [symbol, minutes, emaShort, emaLong]);
 
   // Live updates via Binance futures websocket kline stream with auto-reconnect and endpoint fallback.
   useEffect(() => {
+    if (!seedReady) return; // wait until REST seed is ready to avoid dropping early messages
     const q = (symbol || '').toString().replace(/[^A-Za-z0-9]/g, '').toLowerCase();
     const interval = `${Number(minutes) || 1}m`;
     if (!q) return;
@@ -173,7 +177,7 @@ export default function ChartBox({ symbol, minutes = 1, emaShort = 9, emaLong = 
 
     connectWS(0);
     return () => { disposed = true; resetState(); };
-  }, [symbol, minutes, emaShort, emaLong]);
+  }, [symbol, minutes, emaShort, emaLong, seedReady]);
 
   if (!points || !points.candles || points.candles.length === 0) {
     return (
