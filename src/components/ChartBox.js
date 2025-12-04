@@ -132,10 +132,19 @@ const ChartBox = React.forwardRef(function ChartBox({ symbol, minutes = 1, emaSh
     }
   }), []);
 
+  const toInterval = (mins) => {
+    const m = Math.max(1, Number(mins) || 1);
+    if (m % 60 === 0) {
+      const h = m / 60;
+      return `${h}h`;
+    }
+    return `${m}m`;
+  };
+
   useEffect(() => {
     const qREST = (symbol || '').toString().replace(/[^A-Za-z0-9]/g, '').toUpperCase();
     const qWS = qREST.toLowerCase();
-    const interval = `${Number(minutes) || 1}m`;
+    const interval = toInterval(minutes);
     if (!qREST) return;
     let closed = false;
     // reset seed gate when starting a new seed
