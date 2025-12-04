@@ -1,4 +1,4 @@
-import React, { useEffect, useImperativeHandle, useRef, useState } from 'react';
+import React, { useEffect, useImperativeHandle, useRef, useState, useCallback } from 'react';
 import { calculateInitialEMA, updateEMA } from '../utils/ema';
 
 // Render a live candlestick chart seeded from REST and updated via websocket,
@@ -9,12 +9,85 @@ const ChartBox = React.forwardRef(function ChartBox({ symbol, minutes = 1, emaSh
   const wsRef = useRef(null);
   const latestRef = useRef({ candles: [], emaS: [], emaL: [], emaSVal: null, emaLVal: null });
   const seedReadyRef = useRef(false);
+  const [seedReady, setSeedReady] = useState(false);
   const reconnectAttemptsRef = useRef(0);
   const containerRef = useRef(null);
   const lastActivityRef = useRef(0);
   const watchdogTimerRef = useRef(null);
   const wsModeRef = useRef('combined'); // default to combined (kline + aggTrade)
   const pollTimerRef = useRef(null); // REST polling fallback when WS is unavailable
+
+  const stopPolling = useCallback(() => {
+    if (pollTimerRef.current) {
+      try { clearInterval(pollTimerRef.current); } catch (e) {}
+      pollTimerRef.current = null;
+    }
+  }, []);
+
+  const startPolling = useCallback(() => {
+    if (pollTimerRef.current) return;
+    const qUp = (symbol || '').toString().replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+    const intv = `${Number(minutes) || 1}m`;
+    const stepMs = 3000;
+    const pollOnce = async () => {
+      try {
+        const res = await fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=${qUp}&interval=${intv}&limit=2`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!Array.isArray(data) || data.length === 0) return;
+        const last = data[data.length - 1];
+        const t = Number(last[0]);
+        const o = Number(last[1]);
+        const h = Number(last[2]);
+        const l = Number(last[3]);
+        const c = Number(last[4]);
+        const closeTime = Number(last[6]);
+        if (![t,o,h,l,c,closeTime].every(Number.isFinite)) return;
+        const isClosed = Date.now() >= closeTime;
+        // apply same update logic as WS
+        let { candles, emaS, emaL, emaSVal, emaLVal } = latestRef.current;
+        if (!candles || candles.length === 0) return;
+        const lastLocal = candles[candles.length - 1];
+        if (lastLocal && lastLocal.t === t) {
+          if (isClosed) {
+            const updated = { o, h, l, c, t };
+            const nextCandles = candles.slice(0, -1).concat(updated).slice(-200);
+            emaSVal = updateEMA(emaSVal ?? emaS[emaS.length - 1], c, emaShort);
+            emaLVal = updateEMA(emaLVal ?? emaL[emaL.length - 1], c, emaLong);
+            const nextES = [...emaS.slice(0, -1), emaSVal].slice(-200);
+            const nextEL = [...emaL.slice(0, -1), emaLVal].slice(-200);
+            latestRef.current = { candles: nextCandles, emaS: nextES, emaL: nextEL, emaSVal, emaLVal };
+            setPoints({ candles: nextCandles, emaS: nextES, emaL: nextEL });
+          } else {
+            const preview = { o, h, l, c, t };
+            const previewCandles = candles.slice(0, -1).concat(preview);
+            const prevES = emaS[emaS.length - 1];
+            const prevEL = emaL[emaL.length - 1];
+            const previewES = updateEMA(prevES, c, emaShort);
+            const previewEL = updateEMA(prevEL, c, emaLong);
+            setPoints({ candles: previewCandles, emaS: [...emaS.slice(0, -1), previewES], emaL: [...emaL.slice(0, -1), previewEL] });
+          }
+        } else {
+          if (isClosed) {
+            const nextCandles = [...candles, { o, h, l, c, t }].slice(-200);
+            emaSVal = updateEMA(emaSVal ?? emaS[emaS.length - 1], c, emaShort);
+            emaLVal = updateEMA(emaLVal ?? emaL[emaL.length - 1], c, emaLong);
+            const nextES = [...emaS, emaSVal].slice(-200);
+            const nextEL = [...emaL, emaLVal].slice(-200);
+            latestRef.current = { candles: nextCandles, emaS: nextES, emaL: nextEL, emaSVal, emaLVal };
+            setPoints({ candles: nextCandles, emaS: nextES, emaL: nextEL });
+          } else {
+            const previewCandles = [...candles, { o, h, l, c, t }].slice(-200);
+            const previewES = updateEMA(emaS[emaS.length - 1], c, emaShort);
+            const previewEL = updateEMA(emaL[emaL.length - 1], c, emaLong);
+            setPoints({ candles: previewCandles, emaS: [...emaS, previewES].slice(-200), emaL: [...emaL, previewEL].slice(-200) });
+          }
+        }
+      } catch (e) { /* ignore */ }
+    };
+    pollTimerRef.current = setInterval(pollOnce, stepMs);
+    pollOnce();
+  }, [symbol, minutes, emaShort, emaLong]);
   // Expose snapshot method before any early returns
   useImperativeHandle(ref, () => ({
     async getSnapshotPng() {
@@ -59,6 +132,7 @@ const ChartBox = React.forwardRef(function ChartBox({ symbol, minutes = 1, emaSh
     if (!q) return;
     // reset seed gate when starting a new seed
     seedReadyRef.current = false;
+    setSeedReady(false);
     (async () => {
       try {
         const need = Math.max(Number(emaShort) || 9, Number(emaLong) || 26) + 120;
@@ -98,9 +172,12 @@ const ChartBox = React.forwardRef(function ChartBox({ symbol, minutes = 1, emaSh
         latestRef.current = { candles: alignedCandles, emaS: emaSArr, emaL: emaLArr, emaSVal: emaSArr[emaSArr.length - 1], emaLVal: emaLArr[emaLArr.length - 1] };
         setPoints({ candles: alignedCandles, emaS: emaSArr, emaL: emaLArr });
         seedReadyRef.current = true;
+        setSeedReady(true);
         // reset reconnect attempts on fresh seed
         reconnectAttemptsRef.current = 0;
         lastActivityRef.current = Date.now();
+        // start polling immediately; it will stop when WS opens
+        startPolling();
       } catch (e) { setPoints(null); }
     })();
   }, [symbol, minutes, emaShort, emaLong]);
@@ -110,7 +187,7 @@ const ChartBox = React.forwardRef(function ChartBox({ symbol, minutes = 1, emaSh
     const q = (symbol || '').toString().replace(/[^A-Za-z0-9]/g, '').toLowerCase();
     const interval = `${Number(minutes) || 1}m`;
     if (!q) return;
-    if (!seedReadyRef.current) return; // wait until REST seed ready
+    if (!seedReady) return; // wait until REST seed ready
 
     let closed = false;
     const stopPolling = () => {
@@ -318,9 +395,9 @@ const ChartBox = React.forwardRef(function ChartBox({ symbol, minutes = 1, emaSh
       closed = true;
       try { if (wsRef.current) wsRef.current.close(); } catch (e) {}
       if (watchdogTimerRef.current) { try { clearInterval(watchdogTimerRef.current); } catch (e) {} watchdogTimerRef.current = null; }
-      if (pollTimerRef.current) { try { clearInterval(pollTimerRef.current); } catch (e) {} pollTimerRef.current = null; }
+      stopPolling();
     };
-  }, [symbol, minutes, emaShort, emaLong]);
+  }, [symbol, minutes, emaShort, emaLong, seedReady]);
 
   // Recompute EMA overlays immediately when periods change
   useEffect(() => {
