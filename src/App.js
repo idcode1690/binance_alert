@@ -709,6 +709,12 @@ function App() {
             <div style={{ marginTop: 12 }}>
               <Metrics activeSymbol={activeSymbol} symbol={symbol} lastPrice={lastPrice} lastTick={lastTick} lastCandleClosed={lastCandleClosed} cross={cross} confirmedCross={confirmedCross} ema9={ema9} ema26={ema26} monitorEma1={monitorEma1} monitorEma2={monitorEma2} />
             </div>
+            {/* lightweight debug strip and simulate button */}
+            <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div className="monitor-badge">{`${monitorMinutes}m · EMA${monitorEma1}/${monitorEma2}`}</div>
+              <div className="monitor-badge" title="Confirmed cross direction">{`Confirmed: ${confirmedCross || '—'}`}</div>
+              <button type="button" className="menu-btn" title="Simulate a confirmed cross (adds to Alerts and sends Telegram if configured)" onClick={() => { try { simulateConfirmedCross(); } catch (e) {} }}>Simulate Cross</button>
+            </div>
             {/* Notes moved below Alerts */}
 
             {/* inline toast for quick feedback */}
