@@ -133,16 +133,17 @@ const ChartBox = React.forwardRef(function ChartBox({ symbol, minutes = 1, emaSh
   }), []);
 
   useEffect(() => {
-    const q = (symbol || '').toString().replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+    const qREST = (symbol || '').toString().replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+    const qWS = qREST.toLowerCase();
     const interval = `${Number(minutes) || 1}m`;
-    if (!q) return;
+    if (!qREST) return;
     let closed = false;
     // reset seed gate when starting a new seed
     (async () => {
       try {
         const need = Math.max(Number(emaShort) || 9, Number(emaLong) || 26) + 120;
         const limit = Math.min(1000, Math.max(need, 300));
-        const res = await fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=${q}&interval=${interval}&limit=${limit}`);
+        const res = await fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=${qREST}&interval=${interval}&limit=${limit}`);
         if (!res.ok) return;
         const data = await res.json();
         const candles = (data || []).map(k => ({
@@ -185,8 +186,8 @@ const ChartBox = React.forwardRef(function ChartBox({ symbol, minutes = 1, emaSh
     const connectWs = () => {
       if (closed) return;
       try {
-        const stream = `${q}@kline_${interval}`;
-        const tradeStream = `${q}@aggTrade`;
+        const stream = `${qWS}@kline_${interval}`;
+        const tradeStream = `${qWS}@aggTrade`;
         const mode = wsModeRef.current || 'single';
         const url = mode === 'combined'
           ? `wss://fstream.binance.com/stream?streams=${stream}/${tradeStream}`
