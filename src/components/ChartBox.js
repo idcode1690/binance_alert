@@ -38,7 +38,7 @@ export default function ChartBox({ symbol, minutes = 1, emaShort = 9, emaLong = 
     );
   }
 
-  const w = 420; const h = 140; const pad = 8;
+  const w = 800; const h = 160; const pad = 8; // width will be 100%; w used for viewBox
   const startIdx = Math.max(0, points.closes.length - 80);
   const slice = points.closes.slice(startIdx);
   const min = Math.min(...slice); const max = Math.max(...slice);
@@ -54,9 +54,8 @@ export default function ChartBox({ symbol, minutes = 1, emaShort = 9, emaLong = 
   const emaLPath = toPath(points.emaL.length ? points.emaL : slice);
 
   return (
-    <div className="chart-box card">
-      <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
-        <rect x="0" y="0" width={w} height={h} fill="var(--panel-alt-bg)" stroke="var(--panel-border)" rx="6" />
+    <div className="chart-box">
+      <svg className="chart-svg" width="100%" height={h} viewBox={`0 0 ${w} ${h}`}>
         <path d={pricePath} fill="none" stroke="var(--text)" strokeWidth="1.2" />
         <path d={emaSPath} fill="none" stroke="#10b981" strokeWidth="1.2" />
         <path d={emaLPath} fill="none" stroke="#ef4444" strokeWidth="1.2" />
