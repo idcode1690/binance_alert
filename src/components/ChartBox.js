@@ -354,6 +354,21 @@ const ChartBox = React.forwardRef(function ChartBox({ symbol, minutes = 1, emaSh
   const lastEmaS = points.emaS.length ? points.emaS[points.emaS.length - 1] : null;
   const lastEmaL = points.emaL.length ? points.emaL[points.emaL.length - 1] : null;
 
+  // Detect EMA cross points within the current view window
+  const emaSWin = points.emaS.length ? points.emaS.slice(Math.max(0, points.emaS.length - viewCandles.length)) : [];
+  const emaLWin = points.emaL.length ? points.emaL.slice(Math.max(0, points.emaL.length - viewCandles.length)) : [];
+  const crossIdxs = [];
+  const crossLen = Math.min(emaSWin.length, emaLWin.length);
+  if (crossLen >= 2) {
+    for (let i = 1; i < crossLen; i++) {
+      const dPrev = emaSWin[i - 1] - emaLWin[i - 1];
+      const dNow = emaSWin[i] - emaLWin[i];
+      if (!Number.isFinite(dPrev) || !Number.isFinite(dNow)) continue;
+      if (dPrev === 0 || dPrev * dNow < 0) {
+        crossIdxs.push(i);
+      }
+    }
+  }
   
 
   return (
@@ -378,6 +393,11 @@ const ChartBox = React.forwardRef(function ChartBox({ symbol, minutes = 1, emaSh
         })}
         <path d={emaSPath} fill="none" stroke="#10b981" strokeWidth="1.2" />
         <path d={emaLPath} fill="none" stroke="#ef4444" strokeWidth="1.2" />
+        {crossIdxs.map((i) => {
+          const cx = x(i);
+          const cy = y((emaSWin[i] + emaLWin[i]) / 2);
+          return <circle key={`cross-${i}`} cx={cx} cy={cy} r={2.3} fill="#ffffff" stroke="#000000" strokeWidth="0.4" />;
+        })}
       </svg>
       <div className="chart-legend">
         <span className="legend-item" style={{ color: '#10b981' }}>{`EMA${emaShort}${lastEmaS!=null?`: ${lastEmaS.toFixed(2)}`:''}`}</span>
