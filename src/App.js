@@ -337,44 +337,6 @@ function App() {
     return () => { try { ctrl.abort(); } catch (e) {} clearTimeout(t); };
   }, [serverUrl, monitorMinutes, monitorEma1, monitorEma2, showToast]);
 
-  // Debug helper: simulate a confirmed cross from the frontend (calls /send-alert and adds local event)
-  const simulateConfirmedCross = React.useCallback((forceType) => {
-    try {
-      const type = forceType || (confirmedCross || 'bull');
-      const sym = (activeSymbol || symbol || '').toString().replace(/[^A-Za-z0-9]/g, '').toUpperCase();
-      const price = lastPrice || 0;
-  // Use configured EMA labels (monitorEma1/monitorEma2) in the message text
-  const text = `${sym} ${type === 'bull' ? `Bullish EMA${monitorEma1} > EMA${monitorEma2}` : `Bearish EMA${monitorEma1} < EMA${monitorEma2}`} @ ${price}`;
-      // add local event
-      const ev = { ts: Date.now(), time: new Date().toLocaleString(), type: type === 'bull' ? 'bull' : 'bear', price, symbol: sym, source: 'client-sim' };
-      addEvent(ev);
-      // fire server send
-      (async () => {
-        if (!serverUrl) {
-          // no server configured (static mode): inform user that Telegram relay is disabled
-          try { showToast('Telegram disabled: no server configured', false); } catch (e) {}
-          if (showDebug) console.debug('[App] simulateConfirmedCross skipped POST /send-alert because serverUrl is not set');
-          return;
-        }
-        try {
-          if (showDebug) console.debug('[App] simulate sending /send-alert', { url: `${serverUrl}/send-alert`, payload: { symbol: sym, price, message: text, emaShort: monitorEma1, emaLong: monitorEma2 } });
-          const res = await fetch(`${serverUrl}/send-alert`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ symbol: sym, price, message: text, emaShort: monitorEma1, emaLong: monitorEma2, confirmed: true }) });
-          let json = null;
-          try { json = await res.json(); } catch (e) { json = null; }
-          const sendEv = { ts: Date.now(), time: new Date().toLocaleString(), type: 'telegram_send', symbol: sym, source: 'client-send', ok: res.ok, status: res.status, body: json };
-          addEvent(sendEv);
-          // show immediate toast to user
-          try { showToast(res.ok ? `Telegram send OK (${sym})` : `Telegram send failed (${res.status})`, res.ok); } catch (e) {}
-          if (showDebug) console.debug('[App] simulate /send-alert response', sendEv);
-        } catch (e) {
-          const errEv = { ts: Date.now(), time: new Date().toLocaleString(), type: 'telegram_send', symbol: sym, source: 'client-send', ok: false, error: String(e) };
-          addEvent(errEv);
-          try { showToast(`Telegram send error: ${String(e)}`, false); } catch (err) {}
-          if (showDebug) console.debug('[App] simulate send-alert failed', e);
-        }
-      })();
-    } catch (e) { if (showDebug) console.debug('[App] simulateConfirmedCross error', e); }
-  }, [activeSymbol, symbol, lastPrice, addEvent, showDebug, confirmedCross, showToast, serverUrl, monitorEma1, monitorEma2]);
 
  
 
@@ -709,11 +671,10 @@ function App() {
             <div style={{ marginTop: 12 }}>
               <Metrics activeSymbol={activeSymbol} symbol={symbol} lastPrice={lastPrice} lastTick={lastTick} lastCandleClosed={lastCandleClosed} cross={cross} confirmedCross={confirmedCross} ema9={ema9} ema26={ema26} monitorEma1={monitorEma1} monitorEma2={monitorEma2} />
             </div>
-            {/* lightweight debug strip and simulate button */}
+            {/* lightweight monitor badges */}
             <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
               <div className="monitor-badge">{`${monitorMinutes}m · EMA${monitorEma1}/${monitorEma2}`}</div>
               <div className="monitor-badge" title="Confirmed cross direction">{`Confirmed: ${confirmedCross || '—'}`}</div>
-              <button type="button" className="menu-btn" title="Simulate a confirmed cross (adds to Alerts and sends Telegram if configured)" onClick={() => { try { simulateConfirmedCross(); } catch (e) {} }}>Simulate Cross</button>
             </div>
             {/* Notes moved below Alerts */}
 
@@ -824,7 +785,7 @@ function App() {
                 )}
 
                 {view === 'debug' ? (
-                  <DebugPanel availableSymbols={availableSymbols} fetchExchangeInfo={fetchExchangeInfo} showDebug={showDebug} setMarketCheckResult={setMarketCheckResult} marketCheckResult={marketCheckResult} symbol={symbol} onSimulateAlert={simulateConfirmedCross} />
+                  <DebugPanel availableSymbols={availableSymbols} fetchExchangeInfo={fetchExchangeInfo} showDebug={showDebug} setMarketCheckResult={setMarketCheckResult} marketCheckResult={marketCheckResult} symbol={symbol} />
                 ) : null}
 
                 {/* Status moved to TopMenu */}
