@@ -8,6 +8,7 @@ export default function ChartBox({ symbol, minutes = 1, emaShort = 9, emaLong = 
   const [points, setPoints] = useState(null);
   const wsRef = useRef(null);
   const latestRef = useRef({ candles: [], emaS: [], emaL: [], emaSVal: null, emaLVal: null });
+  const reconnectRef = useRef({ attempt: 0, timer: null, hadMessage: false });
 
   useEffect(() => {
     const q = (symbol || '').toString().replace(/[^A-Za-z0-9]/g, '').toUpperCase();
@@ -42,69 +43,109 @@ export default function ChartBox({ symbol, minutes = 1, emaShort = 9, emaLong = 
     })();
   }, [symbol, minutes, emaShort, emaLong]);
 
-  // Live updates via Binance futures websocket kline stream, mirroring Binance behavior.
+  // Live updates via Binance futures websocket kline stream with auto-reconnect and endpoint fallback.
   useEffect(() => {
     const q = (symbol || '').toString().replace(/[^A-Za-z0-9]/g, '').toLowerCase();
     const interval = `${Number(minutes) || 1}m`;
     if (!q) return;
     const stream = `${q}@kline_${interval}`;
-    const url = `wss://fstream.binance.com/ws/${stream}`;
-    try {
-      const ws = new WebSocket(url);
-      wsRef.current = ws;
-      ws.onmessage = (ev) => {
-        try {
-          const payload = JSON.parse(ev.data);
-          const k = payload.k || (payload.data && payload.data.k) || null;
-          if (!k) return;
-          const o = Number(k.o); const h = Number(k.h); const l = Number(k.l); const c = Number(k.c); const t = Number(k.t);
-          const isClosed = !!k.x; // true if candle closed
-          if (![o,h,l,c,t].every(Number.isFinite)) return;
-          let { candles, emaS, emaL, emaSVal, emaLVal } = latestRef.current;
-          if (!candles || candles.length === 0) return;
-          const last = candles[candles.length - 1];
-          if (last && last.t === t) {
-            if (isClosed) {
-              const updated = { o, h, l, c, t };
-              const nextCandles = candles.slice(0, -1).concat(updated).slice(-200);
-              emaSVal = updateEMA(emaSVal ?? emaS[emaS.length - 1], c, emaShort);
-              emaLVal = updateEMA(emaLVal ?? emaL[emaL.length - 1], c, emaLong);
-              const nextES = [...emaS.slice(0, -1), emaSVal].slice(-200);
-              const nextEL = [...emaL.slice(0, -1), emaLVal].slice(-200);
-              latestRef.current = { candles: nextCandles, emaS: nextES, emaL: nextEL, emaSVal, emaLVal };
-              setPoints({ candles: nextCandles, emaS: nextES, emaL: nextEL });
+
+    let disposed = false;
+    const resetState = () => {
+      try {
+        if (wsRef.current) { wsRef.current.onopen = null; wsRef.current.onmessage = null; wsRef.current.onerror = null; wsRef.current.onclose = null; wsRef.current.close(); }
+      } catch (e) {}
+      wsRef.current = null;
+      if (reconnectRef.current.timer) { clearTimeout(reconnectRef.current.timer); reconnectRef.current.timer = null; }
+      reconnectRef.current.attempt = 0;
+      reconnectRef.current.hadMessage = false;
+    };
+
+    const endpoints = [
+      `wss://fstream.binance.com/ws/${stream}`,
+      `wss://fstream.binance.com/stream?streams=${stream}`
+    ];
+
+    const connectWS = (endpointIdx = 0) => {
+      if (disposed) return;
+      const url = endpoints[Math.min(endpointIdx, endpoints.length - 1)];
+      let switched = false;
+      try {
+        const ws = new WebSocket(url);
+        wsRef.current = ws;
+        ws.onopen = () => { reconnectRef.current.attempt = 0; };
+        ws.onmessage = (ev) => {
+          reconnectRef.current.hadMessage = true;
+          try {
+            const payload = JSON.parse(ev.data);
+            const k = payload.k || (payload.data && payload.data.k) || null;
+            if (!k) return;
+            const o = Number(k.o); const h = Number(k.h); const l = Number(k.l); const c = Number(k.c); const t = Number(k.t);
+            const isClosed = !!k.x; // true if candle closed
+            if (![o,h,l,c,t].every(Number.isFinite)) return;
+            let { candles, emaS, emaL, emaSVal, emaLVal } = latestRef.current;
+            if (!candles || candles.length === 0) return;
+            const last = candles[candles.length - 1];
+            if (last && last.t === t) {
+              if (isClosed) {
+                const updated = { o, h, l, c, t };
+                const nextCandles = candles.slice(0, -1).concat(updated).slice(-200);
+                emaSVal = updateEMA(emaSVal ?? emaS[emaS.length - 1], c, emaShort);
+                emaLVal = updateEMA(emaLVal ?? emaL[emaL.length - 1], c, emaLong);
+                const nextES = [...emaS.slice(0, -1), emaSVal].slice(-200);
+                const nextEL = [...emaL.slice(0, -1), emaLVal].slice(-200);
+                latestRef.current = { candles: nextCandles, emaS: nextES, emaL: nextEL, emaSVal, emaLVal };
+                setPoints({ candles: nextCandles, emaS: nextES, emaL: nextEL });
+              } else {
+                const preview = { o, h, l, c, t };
+                const previewCandles = candles.slice(0, -1).concat(preview);
+                const prevES = emaS[emaS.length - 1];
+                const prevEL = emaL[emaL.length - 1];
+                const previewES = updateEMA(prevES, c, emaShort);
+                const previewEL = updateEMA(prevEL, c, emaLong);
+                setPoints({ candles: previewCandles, emaS: [...emaS.slice(0, -1), previewES], emaL: [...emaL.slice(0, -1), previewEL] });
+              }
             } else {
-              const preview = { o, h, l, c, t };
-              const previewCandles = candles.slice(0, -1).concat(preview);
-              const prevES = emaS[emaS.length - 1];
-              const prevEL = emaL[emaL.length - 1];
-              const previewES = updateEMA(prevES, c, emaShort);
-              const previewEL = updateEMA(prevEL, c, emaLong);
-              setPoints({ candles: previewCandles, emaS: [...emaS.slice(0, -1), previewES], emaL: [...emaL.slice(0, -1), previewEL] });
+              if (isClosed) {
+                const nextCandles = [...candles, { o, h, l, c, t }].slice(-200);
+                emaSVal = updateEMA(emaSVal ?? emaS[emaS.length - 1], c, emaShort);
+                emaLVal = updateEMA(emaLVal ?? emaL[emaL.length - 1], c, emaLong);
+                const nextES = [...emaS, emaSVal].slice(-200);
+                const nextEL = [...emaL, emaLVal].slice(-200);
+                latestRef.current = { candles: nextCandles, emaS: nextES, emaL: nextEL, emaSVal, emaLVal };
+                setPoints({ candles: nextCandles, emaS: nextES, emaL: nextEL });
+              } else {
+                // new preview candle opened
+                const previewCandles = [...candles, { o, h, l, c, t }].slice(-200);
+                const previewES = updateEMA(emaS[emaS.length - 1], c, emaShort);
+                const previewEL = updateEMA(emaL[emaL.length - 1], c, emaLong);
+                setPoints({ candles: previewCandles, emaS: [...emaS, previewES].slice(-200), emaL: [...emaL, previewEL].slice(-200) });
+              }
             }
-          } else {
-            if (isClosed) {
-              const nextCandles = [...candles, { o, h, l, c, t }].slice(-200);
-              emaSVal = updateEMA(emaSVal ?? emaS[emaS.length - 1], c, emaShort);
-              emaLVal = updateEMA(emaLVal ?? emaL[emaL.length - 1], c, emaLong);
-              const nextES = [...emaS, emaSVal].slice(-200);
-              const nextEL = [...emaL, emaLVal].slice(-200);
-              latestRef.current = { candles: nextCandles, emaS: nextES, emaL: nextEL, emaSVal, emaLVal };
-              setPoints({ candles: nextCandles, emaS: nextES, emaL: nextEL });
-            } else {
-              // new preview candle opened
-              const previewCandles = [...candles, { o, h, l, c, t }].slice(-200);
-              const previewES = updateEMA(emaS[emaS.length - 1], c, emaShort);
-              const previewEL = updateEMA(emaL[emaL.length - 1], c, emaLong);
-              setPoints({ candles: previewCandles, emaS: [...emaS, previewES].slice(-200), emaL: [...emaL, previewEL].slice(-200) });
-            }
+          } catch (e) {}
+        };
+        ws.onerror = () => {
+          // if no messages yet on this endpoint, try fallback endpoint immediately once
+          if (!switched && !reconnectRef.current.hadMessage && endpointIdx + 1 < endpoints.length) {
+            switched = true;
+            try { ws.close(); } catch (e) {}
+            connectWS(endpointIdx + 1);
           }
-        } catch (e) {}
-      };
-      ws.onerror = () => {};
-      ws.onclose = () => {};
-    } catch (e) {}
-    return () => { try { if (wsRef.current) wsRef.current.close(); } catch (e) {} };
+        };
+        ws.onclose = () => {
+          if (disposed) return;
+          const attempt = ++reconnectRef.current.attempt;
+          const delay = Math.min(30000, 500 * Math.pow(2, attempt - 1));
+          reconnectRef.current.timer = setTimeout(() => {
+            reconnectRef.current.hadMessage = false;
+            connectWS(0); // retry from primary endpoint
+          }, delay);
+        };
+      } catch (e) {}
+    };
+
+    connectWS(0);
+    return () => { disposed = true; resetState(); };
   }, [symbol, minutes, emaShort, emaLong]);
 
   if (!points || !points.candles || points.candles.length === 0) {
